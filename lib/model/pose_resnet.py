@@ -11,6 +11,16 @@ from collections import OrderedDict
 
 import torch
 import torch.nn as nn
+from torch.utils.model_zoo import load_url
+
+
+model_urls = {
+    'resnet18': 'https://download.pytorch.org/models/resnet18-5c106cde.pth',
+    'resnet34': 'https://download.pytorch.org/models/resnet34-333f7ec4.pth',
+    'resnet50': 'https://download.pytorch.org/models/resnet50-19c8e357.pth',
+    'resnet101': 'https://download.pytorch.org/models/resnet101-5d3b4d8f.pth',
+    'resnet152': 'https://download.pytorch.org/models/resnet152-b121ed2d.pth',
+}
 
 BN_MOMENTUM = 0.1
 logger = logging.getLogger(__name__)
@@ -240,53 +250,44 @@ class PoseResNet(nn.Module):
 
         return x
 
-    def init_weights(self, pretrained=''):
-        if os.path.isfile(pretrained):
-            logger.info('=> init deconv weights from normal distribution')
-            for name, m in self.deconv_layers.named_modules():
-                if isinstance(m, nn.ConvTranspose2d):
-                    logger.info('=> init {}.weight as normal(0, 0.001)'.format(name))
-                    logger.info('=> init {}.bias as 0'.format(name))
-                    nn.init.normal_(m.weight, std=0.001)
-                elif isinstance(m, nn.BatchNorm2d):
-                    logger.info('=> init {}.weight as 1'.format(name))
-                    logger.info('=> init {}.bias as 0'.format(name))
-                    nn.init.constant_(m.weight, 1)
-                    nn.init.constant_(m.bias, 0)
-            logger.info('=> init final conv weights from normal distribution')
-            for name, m in self.final_layer.named_modules():  # TODO: updated
-                if isinstance(m, nn.Conv2d):
-                    # nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-                    logger.info('=> init {}.weight as normal(0, 0.001)'.format(name))
-                    logger.info('=> init {}.bias as 0'.format(name))
-                    nn.init.normal_(m.weight, std=0.001)
-                    nn.init.constant_(m.bias, 0)
+    def init_weights(self, checkpoint):
+        logger.info('=> init deconv weights from normal distribution')
+        for name, m in self.deconv_layers.named_modules():
+            if isinstance(m, nn.ConvTranspose2d):
+                logger.info('=> init {}.weight as normal(0, 0.001)'.format(name))
+                logger.info('=> init {}.bias as 0'.format(name))
+                nn.init.normal_(m.weight, std=0.001)
+            elif isinstance(m, nn.BatchNorm2d):
+                logger.info('=> init {}.weight as 1'.format(name))
+                logger.info('=> init {}.bias as 0'.format(name))
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+        logger.info('=> init final conv weights from normal distribution')
+        for name, m in self.final_layer.named_modules():  # TODO: updated
+            if isinstance(m, nn.Conv2d):
+                # nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                logger.info('=> init {}.weight as normal(0, 0.001)'.format(name))
+                logger.info('=> init {}.bias as 0'.format(name))
+                nn.init.normal_(m.weight, std=0.001)
+                nn.init.constant_(m.bias, 0)
 
-            # pretrained_state_dict = torch.load(pretrained)
-            logger.info('=> loading pretrained model {}'.format(pretrained))
-            # self.load_state_dict(pretrained_state_dict, strict=False)
-            checkpoint = torch.load(pretrained)
-            if isinstance(checkpoint, OrderedDict):
-                state_dict = checkpoint
-            elif isinstance(checkpoint, dict) and 'state_dict' in checkpoint:
-                state_dict_old = checkpoint['state_dict']
-                state_dict = OrderedDict()
-                # delete 'module.' because it is saved from DataParallel module
-                for key in state_dict_old.keys():
-                    if key.startswith('module.'):
-                        # state_dict[key[7:]] = state_dict[key]
-                        # state_dict.pop(key)
-                        state_dict[key[7:]] = state_dict_old[key]
-                    else:
-                        state_dict[key] = state_dict_old[key]
-            else:
-                raise RuntimeError(
-                    'No state_dict found in checkpoint file {}'.format(pretrained))
-            self.load_state_dict(state_dict, strict=False)
+        if isinstance(checkpoint, OrderedDict):
+            state_dict = checkpoint
+        elif isinstance(checkpoint, dict) and 'state_dict' in checkpoint:
+            state_dict_old = checkpoint['state_dict']
+            state_dict = OrderedDict()
+            # delete 'module.' because it is saved from DataParallel module
+            for key in state_dict_old.keys():
+                if key.startswith('module.'):
+                    # state_dict[key[7:]] = state_dict[key]
+                    # state_dict.pop(key)
+                    state_dict[key[7:]] = state_dict_old[key]
+                else:
+                    state_dict[key] = state_dict_old[key]
         else:
-            logger.error('=> imagenet pretrained model dose not exist')
-            logger.error('=> please download it first')
-            raise ValueError('imagenet pretrained model does not exist')
+            raise RuntimeError(
+                'No state_dict found in checkpoint file {}'.format(checkpoint))
+        self.load_state_dict(state_dict, strict=False)
 
 
 resnet_spec = {18: (BasicBlock, [2, 2, 2, 2]),
@@ -296,14 +297,15 @@ resnet_spec = {18: (BasicBlock, [2, 2, 2, 2]),
                152: (Bottleneck, [3, 8, 36, 3])}
 
 
-def get_pose_net(cfg, is_train):
+def get_pose_net(cfg):
     num_layers = cfg.MODEL.NUM_LAYERS
 
     block_class, layers = resnet_spec[num_layers]
 
     model = PoseResNet(block_class, layers, cfg)
 
-    if is_train and len(cfg.MODEL.PRETRAINED) > 0:
-        model.init_weights(cfg.MODEL.PRETRAINED)
+    if cfg.MODEL.PRETRAINED:
+        checkpoint = load_url(model_urls['resnet{}'.format(cfg.MODEL.NUM_LAYERS)])
+        model.init_weights(checkpoint)
 
     return model

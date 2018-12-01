@@ -4,5 +4,4 @@ ckpt/
 .backup_viz/
 .idea
 *.swp
-pretrained_models
 data

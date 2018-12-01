@@ -1,5 +1,5 @@
 # project
-PROJ_NAME: pos-resnet50-add-graph
+PROJ_NAME: pos-resnet50
 
 DATA:
   ROOT_PATH: /data/Kwai
@@ -34,7 +34,7 @@ TRAIN:
     STEP_SIZE: 1500
 
 MODEL:
-  PRETRAINED: 'pretrained_models/imagenet/resnet50-19c8e357.pth'
+  PRETRAINED: True
   IMG_SIZE: 256
   NUM_JOINTS: 21
   NUM_LAYERS: 50

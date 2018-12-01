@@ -70,7 +70,7 @@ def main():
 
     resume_ckpt = None if args.resume is None else torch.load(args.resume)
 
-    net = pose_resnet.get_pose_net(config, True)
+    net = pose_resnet.get_pose_net(config)
 
     logger.add_graph(net, (config.TRAIN.BATCH_SIZE, 3,
                            config.MODEL.IMG_SIZE, config.MODEL.IMG_SIZE))
