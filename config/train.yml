@@ -1,0 +1,54 @@
+# project
+PROJ_NAME: pos-resnet50-add-graph
+
+DATA:
+  ROOT_PATH: /data/Kwai
+  CACHE_DIR: data/cache
+
+  #PROJ_NAME: debug
+  CKPT_PATH: ckpt/
+  VIZ_PATH: viz/
+
+# dataset, relative path to `DATA_ROOT_PATH`, will be joined in `options.py`
+  SOURCE_TRAIN_DIR: union/synth
+  TARGET_TRAIN_DIR: union/real
+  VAL_DIR: CMU_Panoptic/hand_labels/manual_test
+
+  # label files
+  SOURCE_TRAIN_LBL_FILE: data/labels/synth/union_train_labels.txt
+  TARGET_TRAIN_LBL_FILE: data/labels/real/union_train_labels.txt
+  VAL_LBL_FILE: data/labels/real/all_test_labels.txt
+
+TRAIN:
+  # NETWORK PARAMS
+  WEIGHT_DECAY: 0.0005
+  MAX_ITER: 16000
+  BATCH_SIZE: 64
+  
+  BASE_LR: 0.0001
+  MIN_LR: 0.00000001 
+  START_ITERS: 0
+  LR_POLICY: 'step'
+  POLICY_PARAMETER:
+    GAMMA: 0.333
+    STEP_SIZE: 1500
+
+MODEL:
+  PRETRAINED: 'pretrained_models/imagenet/resnet50-19c8e357.pth'
+  IMG_SIZE: 256
+  NUM_JOINTS: 21
+  NUM_LAYERS: 50
+  NUM_DECONV_LAYERS: 2
+  NUM_DECONV_FILTERS:
+    - 256
+    - 256
+  NUM_DECONV_KERNELS:
+    - 4
+    - 4
+  FINAL_CONV_KERNEL: 1
+
+MISC:
+  WORKERS: 4
+  TEST_INTERVAL: 500
+  DISP_INTERVAL: 50
+  RANDOM_SEED: 1234
