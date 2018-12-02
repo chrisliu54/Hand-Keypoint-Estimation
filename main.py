@@ -20,7 +20,6 @@ def main():
     device = torch.device('cpu' if args.gpu is None or not torch.cuda.is_available() \
                               else 'cuda:{}'.format(args.gpu[0]))
 
-    # config = Config(args.config)
     assert config.MISC.TEST_INTERVAL is not 0, 'Illegal setting: config.MISC.TEST_INTERVAL = 0!'
 
     # set random seed
@@ -68,25 +67,26 @@ def main():
     logger = Logger(ckpt_path=os.path.join(config.DATA.CKPT_PATH, config.PROJ_NAME),
                     tsbd_path=os.path.join(config.DATA.VIZ_PATH, config.PROJ_NAME))
 
-    resume_ckpt = None if args.resume is None else torch.load(args.resume)
-
-    net = pose_resnet.get_pose_net(config)
-
-    logger.add_graph(net, (config.TRAIN.BATCH_SIZE, 3,
-                           config.MODEL.IMG_SIZE, config.MODEL.IMG_SIZE))
-
-    if args.resume:
-        net.load_state_dict(resume_ckpt['net'])
-
-    net = torch.nn.DataParallel(net.to(device), device_ids=args.gpu)
-
+    net = pose_resnet.get_pose_net(config).to(device)
     optimizer = torch.optim.Adam(net.parameters(), config.TRAIN.BASE_LR,
                                  weight_decay=config.TRAIN.WEIGHT_DECAY)
 
-    criterion = nn.SmoothL1Loss(size_average=False, reduce=False)  # .to(device)
+    input_shape = (config.TRAIN.BATCH_SIZE, 3, config.MODEL.IMG_SIZE, config.MODEL.IMG_SIZE)
+    logger.add_graph(net, input_shape, device)
+
+    if args.resume is not None:
+        print("=> loading checkpoint '{}'".format(args.resume))
+        resume_ckpt = torch.load(args.resume)
+        net.load_state_dict(resume_ckpt['net'])
+        optimizer.load_state_dict(resume_ckpt['optim'])
+        config.TRAIN.START_ITERS = resume_ckpt['iter']
+        logger.best_metric_val = resume_ckpt['best_metric_val']
+    net = torch.nn.DataParallel(net, device_ids=args.gpu)
+
+    criterion = nn.SmoothL1Loss(size_average=False, reduce=False).to(device)
 
     iters = config.TRAIN.START_ITERS
-    total_progress_bar = tqdm.tqdm(desc='Train iter', total=config.TRAIN.MAX_ITER - config.TRAIN.START_ITERS)
+    total_progress_bar = tqdm.tqdm(desc='Train iter', total=config.TRAIN.MAX_ITER, initial=config.TRAIN.START_ITERS)
     epoch = 0
 
     while iters < config.TRAIN.MAX_ITER:

@@ -6,13 +6,10 @@
 
 
 import logging
-import os
 from collections import OrderedDict
 
-import torch
 import torch.nn as nn
 from torch.utils.model_zoo import load_url
-
 
 model_urls = {
     'resnet18': 'https://download.pytorch.org/models/resnet18-5c106cde.pth',

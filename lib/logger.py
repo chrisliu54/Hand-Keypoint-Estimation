@@ -30,8 +30,8 @@ class Logger:
         """Log a graph of embeddings of given features with labels"""
         self.writer.add_embedding(mat=feats, tag=tag, metadata=labels, global_step=self.global_step)
 
-    def add_graph(self, net, input_shape):
-        dump_input = torch.rand(input_shape)
+    def add_graph(self, net, input_shape, device):
+        dump_input = torch.rand(input_shape, device=device)
         self.writer.add_graph(net, (dump_input, ), verbose=False)
 
     def save_ckpt(self, state, cur_metric_val):
