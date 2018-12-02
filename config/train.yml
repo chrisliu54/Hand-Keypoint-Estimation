@@ -4,16 +4,15 @@ PROJ_NAME: pos-resnet50
 EVALUATE: False
 
 DATA:
-  ROOT_PATH: /data/Kwai
   CACHE_DIR: data/cache
 
   CKPT_PATH: ckpt/
   VIZ_PATH: viz/
 
 # dataset, relative path to `DATA_ROOT_PATH`, will be joined in `options.py`
-  SOURCE_TRAIN_DIR: union/synth
-  TARGET_TRAIN_DIR: union/real
-  VAL_DIR: CMU_Panoptic/hand_labels/manual_test
+  SOURCE_TRAIN_DIR: data/images/union/synth
+  TARGET_TRAIN_DIR: data/images/union/real
+  VAL_DIR: data/images/CMU_Panoptic/hand_labels/manual_test
 
   # label files
   SOURCE_TRAIN_LBL_FILE: data/labels/synth/union_train_labels.txt

@@ -80,30 +80,28 @@ def main():
         net.load_state_dict(resume_ckpt['net'])
         optimizer.load_state_dict(resume_ckpt['optim'])
         config.TRAIN.START_ITERS = resume_ckpt['iter']
+        logger.global_step = resume_ckpt['iter']
         logger.best_metric_val = resume_ckpt['best_metric_val']
     net = torch.nn.DataParallel(net, device_ids=config.MISC.GPUS)
 
     if config.EVALUATE:
         pck = evaluate(net, val_loader, img_size=config.MODEL.IMG_SIZE, vis=True,
                        logger=logger, disp_interval=config.MISC.DISP_INTERVAL)
-        print("validate pck: {}".format(pck))
+        print("=> validate pck: {}".format(pck))
         return
 
     criterion = nn.SmoothL1Loss(size_average=False, reduce=False).to(device)
 
-    iters = config.TRAIN.START_ITERS
     total_progress_bar = tqdm.tqdm(desc='Train iter', total=config.TRAIN.MAX_ITER, initial=config.TRAIN.START_ITERS)
     epoch = 0
 
-    while iters < config.TRAIN.MAX_ITER:
+    while logger.global_step < config.TRAIN.MAX_ITER:
         for (stu_inputs, stu_heatmap, _) in tqdm.tqdm(
                 train_loader, total=len(train_loader),
                 desc='Current epoch', ncols=80, leave=False):
 
-            logger.step(1)
-
             # adjust learning rate
-            learning_rate = adjust_learning_rate(optimizer, iters, config)
+            learning_rate = adjust_learning_rate(optimizer, logger.global_step, config)
 
             stu_inputs = stu_inputs.to(device)
             stu_heatmap = stu_heatmap.to(device)
@@ -117,7 +115,7 @@ def main():
             optimizer.step()
 
             # val
-            if iters % config.MISC.TEST_INTERVAL == 0:
+            if logger.global_step % config.MISC.TEST_INTERVAL == 0:
                 # TODO: logging validation `loss` and training pck if necessary
                 pck = evaluate(net, val_loader, img_size=config.MODEL.IMG_SIZE, vis=True,
                                logger=logger, disp_interval=config.MISC.DISP_INTERVAL)
@@ -126,12 +124,11 @@ def main():
                 logger.save_ckpt(state={
                     'net': net.module.state_dict(),
                     'optim': optimizer.state_dict(),
-                    'iter': iters,
+                    'iter': logger.global_step,
                     'best_metric_val': logger.best_metric_val,
-                    'global_step': logger.global_step
                 }, cur_metric_val=pck)
 
-            iters += 1
+            logger.step(1)
             total_progress_bar.update(1)
 
             # log
@@ -140,6 +137,9 @@ def main():
 
         epoch += 1
 
+    total_progress_bar.close()
+
 
 if __name__ == '__main__':
     main()
+    print("=> exit normally")

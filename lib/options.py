@@ -32,9 +32,6 @@ class Config:
     def __init__(self, filename):
         with open(filename, 'r') as f:
             parser = edict(yaml.load(f))
-        parser.DATA.SOURCE_TRAIN_DIR = join(parser.DATA.ROOT_PATH, parser.DATA.SOURCE_TRAIN_DIR)
-        parser.DATA.TARGET_TRAIN_DIR = join(parser.DATA.ROOT_PATH, parser.DATA.TARGET_TRAIN_DIR)
-        parser.DATA.VAL_DIR = join(parser.DATA.ROOT_PATH, parser.DATA.VAL_DIR)
         parser.MISC.GPUS = args.gpus
         print('======CONFIGURATION START======')
         pprint(parser)

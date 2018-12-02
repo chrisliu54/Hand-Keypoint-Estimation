@@ -44,9 +44,11 @@ Go to the root directory of the project, and follow the next steps:
     export CUDA_HOME=/usr/local/cuda${CUDA_HOME:+:${CUDA_HOME}}
     ```  
     Note that this is **not required but recommended**.
-*  Create a directory (`mkdir data`) for label files in the root directory of the project,
+*  Create a directory (`mkdir data`) in the root directory of the project,
     and arrange the layout like this:
     ```
+    ├── cache
+    ├── images -> /data/Kwai
     └── labels
         ├── real
         │   ├── all_test_labels.txt
@@ -61,8 +63,10 @@ Go to the root directory of the project, and follow the next steps:
             ├── vis_test_labels.txt
             └── vis_train_labels.txt
     ```
-    The program will automatically generate a directory named `cache` and save pickle files under it in the first time you run the project 
+    Two more things to note:
+    - The program will automatically generate a directory named `cache` and save pickle files under it for the first time you run
     (it will take a couple of minutes).
+    - `images` is a symbolic link to where you store the images.
     
 
 ### Train
