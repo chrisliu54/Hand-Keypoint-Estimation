@@ -17,8 +17,7 @@ from lib.utils import evaluate, adjust_learning_rate
 
 def main():
     cudnn.benchmark = True
-    device = torch.device('cpu' if config.MISC.GPUS is None or not torch.cuda.is_available() \
-                                else 'cuda:{}'.format(config.MISC.GPUS[0]))
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     assert config.MISC.TEST_INTERVAL is not 0, 'Illegal setting: config.MISC.TEST_INTERVAL = 0!'
 
@@ -82,7 +81,7 @@ def main():
         config.TRAIN.START_ITERS = resume_ckpt['iter']
         logger.global_step = resume_ckpt['iter']
         logger.best_metric_val = resume_ckpt['best_metric_val']
-    net = torch.nn.DataParallel(net, device_ids=config.MISC.GPUS)
+    net = torch.nn.DataParallel(net)
 
     if config.EVALUATE:
         pck = evaluate(net, val_loader, img_size=config.MODEL.IMG_SIZE, vis=True,
@@ -118,7 +117,8 @@ def main():
             if logger.global_step % config.MISC.TEST_INTERVAL == 0:
                 # TODO: logging validation `loss` and training pck if necessary
                 pck = evaluate(net, val_loader, img_size=config.MODEL.IMG_SIZE, vis=True,
-                               logger=logger, disp_interval=config.MISC.DISP_INTERVAL)
+                               logger=logger, disp_interval=config.MISC.DISP_INTERVAL,
+                               show_gt=(logger.global_step == 0))
                 logger.add_scalar('pck@0.2', pck * 100)
 
                 logger.save_ckpt(state={

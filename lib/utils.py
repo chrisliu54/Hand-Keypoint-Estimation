@@ -62,7 +62,7 @@ def PCK(pred, gt, tensor_size, alpha=0.2):
     :param gt: ground truth key points, [N, C, 2]
     :param tensor_size: max(width, height)
     :param alpha: normalized coefficient
-    :return: PCK of current batch, number of key points
+    :return: PCK of current batch, number of correctly detected key points of current batch
     """
     norm_dis = alpha * tensor_size
     dis = (pred.double() - gt) ** 2
@@ -98,7 +98,7 @@ def get_kpts(maps, img_h=368.0, img_w=368.0):
     return torch.from_numpy(np.array(all_kpts))
 
 
-def evaluate(model, loader, img_size, vis=False, logger=None, disp_interval=50):
+def evaluate(model, loader, img_size, vis=False, logger=None, disp_interval=50, show_gt=True):
     """
     :param img_size:
     :param vis:
@@ -140,11 +140,12 @@ def evaluate(model, loader, img_size, vis=False, logger=None, disp_interval=50):
             tot_nkpt += nkpt
             tot_pnt += kpts.numel() / 2
 
-            if vis is not None and idx % disp_interval == 0:
+            if vis and idx % disp_interval == 0:
                 # take the first image of the current batch
                 denorm_img = denormalize(inputs[0])
-                vis_kpt(gt_pnts=gt_kpts[0, ..., :2], img=denorm_img,
-                        save_name='gt_kpt/{}'.format(idx // disp_interval), logger=logger)
+                if show_gt:
+                    vis_kpt(gt_pnts=gt_kpts[0, ..., :2], img=denorm_img,
+                            save_name='gt_kpt/{}'.format(idx // disp_interval), logger=logger)
                 vis_kpt(pred_pnts=kpts[0], img=denorm_img,
                         save_name='pred_kpt/{}'.format(idx // disp_interval), logger=logger)
             idx += 1

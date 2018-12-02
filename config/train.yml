@@ -9,7 +9,6 @@ DATA:
   CKPT_PATH: ckpt/
   VIZ_PATH: viz/
 
-# dataset, relative path to `DATA_ROOT_PATH`, will be joined in `options.py`
   SOURCE_TRAIN_DIR: data/images/union/synth
   TARGET_TRAIN_DIR: data/images/union/real
   VAL_DIR: data/images/CMU_Panoptic/hand_labels/manual_test
@@ -50,5 +49,5 @@ MODEL:
 MISC:
   WORKERS: 4
   TEST_INTERVAL: 500
-  DISP_INTERVAL: 50
+  DISP_INTERVAL: 1
   RANDOM_SEED: 1234
