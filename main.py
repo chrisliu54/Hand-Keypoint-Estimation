@@ -12,7 +12,7 @@ from lib.logger import Logger
 from lib.model import pose_resnet
 from lib.model.adv import *
 from lib.options import config
-from lib.utils import evaluate, adjust_learning_rate
+from lib.utils import evaluate
 
 
 def main():
@@ -43,14 +43,11 @@ def main():
     ])
 
     # train
-    source_dset = HandKptDataset(config.DATA.SOURCE_TRAIN_DIR, config.DATA.SOURCE_TRAIN_LBL_FILE, 8,  # TODO: stride
-                                 transformer=train_transformer)
+    source_dset = HandKptDataset(config.DATA.SOURCE_TRAIN_DIR, config.DATA.SOURCE_TRAIN_LBL_FILE,
+                                 stride=config.MODEL.HEATMAP_STRIDE, transformer=train_transformer)
 
-    # target_dset = HandKptDataset(config.DATA.TARGET_TRAIN_DIR, config.DATA.TARGET_TRAIN_LBL_FILE, 8,
-    #                              transformer=train_transformer)
-
-    val_dset = HandKptDataset(config.DATA.VAL_DIR, config.DATA.VAL_LBL_FILE, 8,
-                              transformer=test_transformer)
+    val_dset = HandKptDataset(config.DATA.VAL_DIR, config.DATA.VAL_LBL_FILE,
+                              stride=config.MODEL.HEATMAP_STRIDE, transformer=test_transformer)
 
     # source only
     train_loader = torch.utils.data.DataLoader(
@@ -92,7 +89,9 @@ def main():
     criterion = nn.SmoothL1Loss(size_average=False, reduce=False).to(device)
 
     iters = config.TRAIN.START_ITERS
-    total_progress_bar = tqdm.tqdm(desc='Train iter', total=config.TRAIN.MAX_ITER, initial=config.TRAIN.START_ITERS)
+    total_progress_bar = tqdm.tqdm(desc='Train iter', ncols=80,
+                                   total=config.TRAIN.MAX_ITER,
+                                   initial=config.TRAIN.START_ITERS)
     epoch = 0
 
     while iters < config.TRAIN.MAX_ITER:
@@ -101,9 +100,6 @@ def main():
                 desc='Current epoch', ncols=80, leave=False):
 
             logger.step(1)
-
-            # adjust learning rate
-            learning_rate = adjust_learning_rate(optimizer, iters, config)
 
             stu_inputs = stu_inputs.to(device)
             stu_heatmap = stu_heatmap.to(device)
@@ -136,7 +132,6 @@ def main():
 
             # log
             logger.add_scalar('regress_loss', loss.item())
-            logger.add_scalar('lr', learning_rate)
 
         epoch += 1
 

@@ -284,6 +284,7 @@ class PoseResNet(nn.Module):
         else:
             raise RuntimeError(
                 'No state_dict found in checkpoint file {}'.format(checkpoint))
+
         self.load_state_dict(state_dict, strict=False)
 
 
