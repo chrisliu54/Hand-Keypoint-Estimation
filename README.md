@@ -72,4 +72,9 @@ python main.py --config config/train.yml --gpu 0
 ```
 
 ### Test
-TBD : )
+ 
+Change `EVALUATE` to `True` and modify `MODEL.RESUME` in config/train.yml and run:
+
+```bash
+python main.py --config config/train.yml --gpu 0
+``` 
