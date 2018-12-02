@@ -9,9 +9,8 @@ from easydict import EasyDict as edict
 parser = argparse.ArgumentParser()
 parser.add_argument('--config', type=str,
                     help='to set the parameters')
-parser.add_argument('--gpu', default=None, nargs='+', type=int,
+parser.add_argument('--gpus', default=None, nargs='+', type=int,
                     help='the gpu used')
-parser.add_argument('--resume', type=str, default=None)
 
 args = parser.parse_args()
 
@@ -35,8 +34,8 @@ class Config:
             parser = edict(yaml.load(f))
         parser.DATA.SOURCE_TRAIN_DIR = join(parser.DATA.ROOT_PATH, parser.DATA.SOURCE_TRAIN_DIR)
         parser.DATA.TARGET_TRAIN_DIR = join(parser.DATA.ROOT_PATH, parser.DATA.TARGET_TRAIN_DIR)
-        parser.DATA.VAL_DIR = join(
-            parser.DATA.ROOT_PATH, parser.DATA.VAL_DIR)
+        parser.DATA.VAL_DIR = join(parser.DATA.ROOT_PATH, parser.DATA.VAL_DIR)
+        parser.MISC.GPUS = args.gpus
         print('======CONFIGURATION START======')
         pprint(parser)
         print('======CONFIGURATION END======')

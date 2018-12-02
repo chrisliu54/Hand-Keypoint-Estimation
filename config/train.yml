@@ -1,11 +1,12 @@
 # project
 PROJ_NAME: pos-resnet50
 
+EVALUATE: False
+
 DATA:
   ROOT_PATH: /data/Kwai
   CACHE_DIR: data/cache
 
-  #PROJ_NAME: debug
   CKPT_PATH: ckpt/
   VIZ_PATH: viz/
 
@@ -20,7 +21,6 @@ DATA:
   VAL_LBL_FILE: data/labels/real/all_test_labels.txt
 
 TRAIN:
-  # NETWORK PARAMS
   WEIGHT_DECAY: 0.0005
   MAX_ITER: 16000
   BATCH_SIZE: 64
@@ -34,6 +34,7 @@ TRAIN:
     STEP_SIZE: 1500
 
 MODEL:
+  RESUME: ""
   PRETRAINED: True
   IMG_SIZE: 256
   NUM_JOINTS: 21

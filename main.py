@@ -11,14 +11,14 @@ from lib.dataset import HandKptDataset
 from lib.logger import Logger
 from lib.model import pose_resnet
 from lib.model.adv import *
-from lib.options import config, args
+from lib.options import config
 from lib.utils import evaluate, adjust_learning_rate
 
 
 def main():
     cudnn.benchmark = True
-    device = torch.device('cpu' if args.gpu is None or not torch.cuda.is_available() \
-                              else 'cuda:{}'.format(args.gpu[0]))
+    device = torch.device('cpu' if config.MISC.GPUS is None or not torch.cuda.is_available() \
+                                else 'cuda:{}'.format(config.MISC.GPUS[0]))
 
     assert config.MISC.TEST_INTERVAL is not 0, 'Illegal setting: config.MISC.TEST_INTERVAL = 0!'
 
@@ -74,14 +74,20 @@ def main():
     input_shape = (config.TRAIN.BATCH_SIZE, 3, config.MODEL.IMG_SIZE, config.MODEL.IMG_SIZE)
     logger.add_graph(net, input_shape, device)
 
-    if args.resume is not None:
-        print("=> loading checkpoint '{}'".format(args.resume))
-        resume_ckpt = torch.load(args.resume)
+    if len(config.MODEL.RESUME) > 0:
+        print("=> loading checkpoint '{}'".format(config.MODEL.RESUME))
+        resume_ckpt = torch.load(config.MODEL.RESUME)
         net.load_state_dict(resume_ckpt['net'])
         optimizer.load_state_dict(resume_ckpt['optim'])
         config.TRAIN.START_ITERS = resume_ckpt['iter']
         logger.best_metric_val = resume_ckpt['best_metric_val']
-    net = torch.nn.DataParallel(net, device_ids=args.gpu)
+    net = torch.nn.DataParallel(net, device_ids=config.MISC.GPUS)
+
+    if config.EVALUATE:
+        pck = evaluate(net, val_loader, img_size=config.MODEL.IMG_SIZE, vis=True,
+                       logger=logger, disp_interval=config.MISC.DISP_INTERVAL)
+        print("validate pck: {}".format(pck))
+        return
 
     criterion = nn.SmoothL1Loss(size_average=False, reduce=False).to(device)
 
@@ -113,8 +119,8 @@ def main():
             # val
             if iters % config.MISC.TEST_INTERVAL == 0:
                 # TODO: logging validation `loss` and training pck if necessary
-                pck = evaluate(net, val_loader, img_size=config.MODEL.IMG_SIZE, vis=True, logger=logger,
-                               disp_interval=config.MISC.DISP_INTERVAL)
+                pck = evaluate(net, val_loader, img_size=config.MODEL.IMG_SIZE, vis=True,
+                               logger=logger, disp_interval=config.MISC.DISP_INTERVAL)
                 logger.add_scalar('pck@0.2', pck * 100)
 
                 logger.save_ckpt(state={
