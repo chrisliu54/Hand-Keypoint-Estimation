@@ -6,3 +6,5 @@ ckpt/
 *.swp
 data
 TODO.md
+scripts/
+logs/

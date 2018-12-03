@@ -17,8 +17,7 @@ from lib.utils import evaluate, adjust_learning_rate
 
 def main():
     cudnn.benchmark = True
-    device = torch.device('cpu' if config.MISC.GPUS is None or not torch.cuda.is_available() \
-                                else 'cuda:{}'.format(config.MISC.GPUS[0]))
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     assert config.MISC.TEST_INTERVAL is not 0, 'Illegal setting: config.MISC.TEST_INTERVAL = 0!'
 
@@ -43,14 +42,16 @@ def main():
     ])
 
     # train
-    source_dset = HandKptDataset(config.DATA.SOURCE_TRAIN_DIR, config.DATA.SOURCE_TRAIN_LBL_FILE, 8,  # TODO: stride
+    source_dset = HandKptDataset(config.DATA.SOURCE.TRAIN.DIR, config.DATA.SOURCE.TRAIN.LBL_FILE, 8,  # TODO: stride
                                  transformer=train_transformer)
 
-    # target_dset = HandKptDataset(config.DATA.TARGET_TRAIN_DIR, config.DATA.TARGET_TRAIN_LBL_FILE, 8,
+    # target_dset = HandKptDataset(config.DATA.TARGET.TRAIN.DIR, config.DATA.TARGET.TRAIN.LBL_FILE, 8,
     #                              transformer=train_transformer)
 
-    val_dset = HandKptDataset(config.DATA.VAL_DIR, config.DATA.VAL_LBL_FILE, 8,
-                              transformer=test_transformer)
+    source_val_dset = HandKptDataset(config.DATA.SOURCE.VAL.DIR, config.DATA.SOURCE.VAL.LBL_FILE, 8,
+                                     transformer=test_transformer)
+    target_val_dset = HandKptDataset(config.DATA.TARGET.VAL.DIR, config.DATA.TARGET.VAL.LBL_FILE, 8,
+                                     transformer=test_transformer)
 
     # source only
     train_loader = torch.utils.data.DataLoader(
@@ -59,8 +60,12 @@ def main():
         num_workers=config.MISC.WORKERS, pin_memory=True)
 
     # val
-    val_loader = torch.utils.data.DataLoader(
-        val_dset,
+    source_val_loader = torch.utils.data.DataLoader(
+        source_val_dset,
+        batch_size=config.TRAIN.BATCH_SIZE, shuffle=False,
+        num_workers=config.MISC.WORKERS, pin_memory=True)
+    target_val_loader = torch.utils.data.DataLoader(
+        target_val_dset,
         batch_size=config.TRAIN.BATCH_SIZE, shuffle=False,
         num_workers=config.MISC.WORKERS, pin_memory=True)
 
@@ -82,12 +87,12 @@ def main():
         config.TRAIN.START_ITERS = resume_ckpt['iter']
         logger.global_step = resume_ckpt['iter']
         logger.best_metric_val = resume_ckpt['best_metric_val']
-    net = torch.nn.DataParallel(net, device_ids=config.MISC.GPUS)
+    net = torch.nn.DataParallel(net)
 
     if config.EVALUATE:
-        pck = evaluate(net, val_loader, img_size=config.MODEL.IMG_SIZE, vis=True,
+        pck05, pck2 = evaluate(net, target_val_loader, img_size=config.MODEL.IMG_SIZE, vis=True,
                        logger=logger, disp_interval=config.MISC.DISP_INTERVAL)
-        print("=> validate pck: {}".format(pck))
+        print("=> validate pck@0.05 = {}, pck@0.2 = {}".format(pck05 * 100, pck2 * 100))
         return
 
     criterion = nn.SmoothL1Loss(size_average=False, reduce=False).to(device)
@@ -101,7 +106,8 @@ def main():
                 desc='Current epoch', ncols=80, leave=False):
 
             # adjust learning rate
-            learning_rate = adjust_learning_rate(optimizer, logger.global_step, config)
+            # learning_rate = adjust_learning_rate(optimizer, logger.global_step, config)
+            learning_rate = optimizer.param_groups[0]['lr']
 
             stu_inputs = stu_inputs.to(device)
             stu_heatmap = stu_heatmap.to(device)
@@ -116,17 +122,24 @@ def main():
 
             # val
             if logger.global_step % config.MISC.TEST_INTERVAL == 0:
-                # TODO: logging validation `loss` and training pck if necessary
-                pck = evaluate(net, val_loader, img_size=config.MODEL.IMG_SIZE, vis=True,
-                               logger=logger, disp_interval=config.MISC.DISP_INTERVAL)
-                logger.add_scalar('pck@0.2', pck * 100)
+                pck05, pck2 = evaluate(net, source_val_loader, img_size=config.MODEL.IMG_SIZE, vis=True,
+                                       logger=logger, disp_interval=config.MISC.DISP_INTERVAL,
+                                       show_gt=(logger.global_step == 0), is_target=False)
+                logger.add_scalar('src_pck@0.05', pck05 * 100)
+                logger.add_scalar('src_pck@0.2', pck2 * 100)
+
+                pck05, pck2 = evaluate(net, target_val_loader, img_size=config.MODEL.IMG_SIZE, vis=True,
+                                       logger=logger, disp_interval=config.MISC.DISP_INTERVAL,
+                                       show_gt=(logger.global_step == 0), is_target=True)
+                logger.add_scalar('tgt_pck@0.05', pck05 * 100)
+                logger.add_scalar('tgt_pck@0.2', pck2 * 100)
 
                 logger.save_ckpt(state={
                     'net': net.module.state_dict(),
                     'optim': optimizer.state_dict(),
                     'iter': logger.global_step,
                     'best_metric_val': logger.best_metric_val,
-                }, cur_metric_val=pck)
+                }, cur_metric_val=pck05)
 
             logger.step(1)
             total_progress_bar.update(1)

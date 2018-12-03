@@ -55,16 +55,16 @@ def adjust_learning_rate(optimizer, iters, config):
         return optimizer.param_groups[0]['lr']  # old lr
 
 
-def PCK(pred, gt, tensor_size, alpha=0.2):
+def PCK(pred, gt, img_side_len, alpha=0.2):
     """
     Calculate the PCK measure
     :param pred: predicted key points, [N, C, 2]
     :param gt: ground truth key points, [N, C, 2]
-    :param tensor_size: max(width, height)
+    :param img_side_len: max(width, height)
     :param alpha: normalized coefficient
-    :return: PCK of current batch, number of key points
+    :return: PCK of current batch, number of correctly detected key points of current batch
     """
-    norm_dis = alpha * tensor_size
+    norm_dis = alpha * img_side_len
     dis = (pred.double() - gt) ** 2
     # [N, C]
     dis = torch.sum(dis, dim=2) ** 0.5
@@ -72,8 +72,8 @@ def PCK(pred, gt, tensor_size, alpha=0.2):
     return nkpt.item() / dis.numel(), nkpt.item()
 
 
-def PCK_curve_pnts(sp, pred, gt, tensor_size):
-    nkpts = [PCK(pred, gt, tensor_size, alpha=a)[1] for a in sp]
+def PCK_curve_pnts(sp, pred, gt, img_side_len):
+    nkpts = [PCK(pred, gt, img_side_len, alpha=a)[1] for a in sp]
     return nkpts
 
 
@@ -98,58 +98,73 @@ def get_kpts(maps, img_h=368.0, img_w=368.0):
     return torch.from_numpy(np.array(all_kpts))
 
 
-def evaluate(model, loader, img_size, vis=False, logger=None, disp_interval=50):
+def evaluate(model, loader, img_size, vis=False, logger=None, disp_interval=50, show_gt=True, is_target=True):
     """
-    :param img_size:
-    :param vis:
-    :param logger:
-    :param disp_interval:
-    :param mode:
+    :param img_size: width/height of img_size (width == height)
+    :param vis: show kpts on images or not
+    :param logger: logger for tensorboardX
+    :param disp_interval: interval of display
     :param model: model to be evaluated
     :param loader: dataloader to be evaluated
-    :return: PCK
+    :param show_gt: show ground truth or not, disabled if vis=False
+    :param is_target: is from target domain or not, disabled if vis=False
+    :return: PCK@0.05, PCK@0.2
     """
     device = next(model.parameters()).device
     previous_state = model.training
     model.eval()
 
-    tot_nkpt = 0
+    thresholds = np.linspace(0, 0.2, 21)
+
+    tot_nkpts = [0] * thresholds.shape[0]
     tot_pnt = 0
     idx = 0
+    domain_prefix = 'tgt' if is_target else 'src'
+
+    # dataset-specific statistics
+    mean = loader.dataset.mean
+    std = loader.dataset.std
     with torch.no_grad():
         for (inputs, *_, gt_kpts) in tqdm.tqdm(
                 loader, desc='Eval', total=len(loader), leave=False
         ):
 
-            tensor_size = img_size
+            img_side_len = img_size
             inputs = inputs.to(device)
 
             # get head_maps for one image
             heats = model(inputs)
 
             # get predicted key points
-            kpts = get_kpts(heats, img_h=tensor_size, img_w=tensor_size)
+            kpts = get_kpts(heats, img_h=img_side_len, img_w=img_side_len)
 
-            # print('predicted kpts  vs  gt kpts')
-            # for kpt, gt_kpt in zip(kpts[0], gt_kpts[0]):
-            #     print('[{}, {}] vs [{}, {}]'
-            #           .format(kpt[0], kpt[1], gt_kpt[0], gt_kpt[1]))
-
-            pck, nkpt = PCK(kpts, gt_kpts[..., :2], tensor_size)
-            # print('pck = {}, nkpt = {}, pnt = {}'.format(pck * 100, nkpt, kpts.numel()/2))
-            tot_nkpt += nkpt
             tot_pnt += kpts.numel() / 2
 
-            if vis is not None and idx % disp_interval == 0:
-                # take the first image of the current batch
-                denorm_img = denormalize(inputs[0])
-                vis_kpt(gt_pnts=gt_kpts[0, ..., :2], img=denorm_img,
-                        save_name='gt_kpt/{}'.format(idx // disp_interval), logger=logger)
+            nkpts = PCK_curve_pnts(thresholds, kpts, gt_kpts[..., :2], img_side_len)
+            for i in range(len(tot_nkpts)):
+                tot_nkpts[i] += nkpts[i]
+
+            if vis and idx % disp_interval == 0:
+                # take the first image of the current batch for visualization
+                denorm_img = denormalize(inputs[0], mean, std)
+                if show_gt:
+                    vis_kpt(gt_pnts=gt_kpts[0, ..., :2], img=denorm_img,
+                            save_name='{}_gt_kpt/{}'.format(domain_prefix, idx // disp_interval), logger=logger)
                 vis_kpt(pred_pnts=kpts[0], img=denorm_img,
-                        save_name='pred_kpt/{}'.format(idx // disp_interval), logger=logger)
+                        save_name='{}_pred_kpt/{}'.format(domain_prefix, idx // disp_interval), logger=logger)
             idx += 1
 
     # recover the state
     model.train(previous_state)
 
-    return tot_nkpt / tot_pnt
+    for i in range(len(tot_nkpts)):
+        tot_nkpts[i] /= tot_pnt
+    if is_target:
+        # draw PCK curve
+        plt.ylim(0, 1.)
+        plt.grid()
+        pck_line, = plt.plot(thresholds, tot_nkpts)
+
+        logger.add_figure('tgt_PCK_curve', pck_line.figure)
+
+    return tot_nkpts[5], tot_nkpts[-1]

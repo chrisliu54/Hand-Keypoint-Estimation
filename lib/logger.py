@@ -34,8 +34,11 @@ class Logger:
         dump_input = torch.rand(input_shape, device=device)
         self.writer.add_graph(net, (dump_input, ), verbose=False)
 
+    def add_figure(self, tag, figure):
+        self.writer.add_figure(tag, figure, self.global_step)
+
     def save_ckpt(self, state, cur_metric_val):
-        path_latest = os.path.join(self.ckpt_path, 'checkpoint.pth')
+        path_latest = os.path.join(self.ckpt_path, 'latest.pth')
         path_best = os.path.join(self.ckpt_path, 'best_model.pth')
         torch.save(state, path_latest)
         if cur_metric_val > self.best_metric_val:
