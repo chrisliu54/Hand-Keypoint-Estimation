@@ -48,8 +48,10 @@ def main():
     # target_dset = HandKptDataset(config.DATA.TARGET_TRAIN_DIR, config.DATA.TARGET_TRAIN_LBL_FILE, 8,
     #                              transformer=train_transformer)
 
-    val_dset = HandKptDataset(config.DATA.VAL_DIR, config.DATA.VAL_LBL_FILE, 8,
-                              transformer=test_transformer)
+    source_val_dset = HandKptDataset(config.DATA.SOURCE_VAL_DIR, config.DATA.SOURCE_VAL_LBL_FILE, 8,
+                                     transformer=test_transformer)
+    target_val_dset = HandKptDataset(config.DATA.TARGET_VAL_DIR, config.DATA.TARGET_VAL_LBL_FILE, 8,
+                                     transformer=test_transformer)
 
     # source only
     train_loader = torch.utils.data.DataLoader(
@@ -58,8 +60,12 @@ def main():
         num_workers=config.MISC.WORKERS, pin_memory=True)
 
     # val
-    val_loader = torch.utils.data.DataLoader(
-        val_dset,
+    source_val_loader = torch.utils.data.DataLoader(
+        source_val_dset,
+        batch_size=config.TRAIN.BATCH_SIZE, shuffle=False,
+        num_workers=config.MISC.WORKERS, pin_memory=True)
+    target_val_loader = torch.utils.data.DataLoader(
+        target_val_dset,
         batch_size=config.TRAIN.BATCH_SIZE, shuffle=False,
         num_workers=config.MISC.WORKERS, pin_memory=True)
 
@@ -84,9 +90,9 @@ def main():
     net = torch.nn.DataParallel(net)
 
     if config.EVALUATE:
-        pck = evaluate(net, val_loader, img_size=config.MODEL.IMG_SIZE, vis=True,
+        pck05, pck2 = evaluate(net, target_val_loader, img_size=config.MODEL.IMG_SIZE, vis=True,
                        logger=logger, disp_interval=config.MISC.DISP_INTERVAL)
-        print("=> validate pck: {}".format(pck))
+        print("=> validate pck@0.05 = {}, pck@0.2 = {}".format(pck05 * 100, pck2 * 100))
         return
 
     criterion = nn.SmoothL1Loss(size_average=False, reduce=False).to(device)
@@ -115,18 +121,25 @@ def main():
 
             # val
             if logger.global_step % config.MISC.TEST_INTERVAL == 0:
-                # TODO: logging validation `loss` and training pck if necessary
-                pck = evaluate(net, val_loader, img_size=config.MODEL.IMG_SIZE, vis=True,
-                               logger=logger, disp_interval=config.MISC.DISP_INTERVAL,
-                               show_gt=(logger.global_step == 0))
-                logger.add_scalar('pck@0.2', pck * 100)
+                pck05, pck2 = evaluate(net, source_val_loader, img_size=config.MODEL.IMG_SIZE, vis=True,
+                                       logger=logger, disp_interval=config.MISC.DISP_INTERVAL,
+                                       show_gt=(logger.global_step == 0), is_target=False)
+                logger.add_scalar('src_pck@0.05', pck05 * 100)
+                logger.add_scalar('src_pck@0.2', pck2 * 100)
+
+                pck05, pck2 = evaluate(net, target_val_loader, img_size=config.MODEL.IMG_SIZE, vis=True,
+                                       logger=logger, disp_interval=config.MISC.DISP_INTERVAL,
+                                       show_gt=(logger.global_step == 0), is_target=True)
+                logger.add_scalar('tgt_pck@0.05', pck05 * 100)
+                logger.add_scalar('tgt_pck@0.2', pck2 * 100)
 
                 logger.save_ckpt(state={
                     'net': net.module.state_dict(),
                     'optim': optimizer.state_dict(),
                     'iter': logger.global_step,
                     'best_metric_val': logger.best_metric_val,
-                }, cur_metric_val=pck)
+                }, cur_metric_val=pck2)
+                # TODO: use only pck@0.2 may not OK
 
             logger.step(1)
             total_progress_bar.update(1)

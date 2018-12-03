@@ -11,12 +11,14 @@ DATA:
 
   SOURCE_TRAIN_DIR: data/images/union/synth
   TARGET_TRAIN_DIR: data/images/union/real
-  VAL_DIR: data/images/CMU_Panoptic/hand_labels/manual_test
+  SOURCE_VAL_DIR: data/images/CMU_Panoptic/hand_labels_synth/all_synth
+  TARGET_VAL_DIR: data/images/CMU_Panoptic/hand_labels/manual_test
 
   # label files
   SOURCE_TRAIN_LBL_FILE: data/labels/synth/union_train_labels.txt
   TARGET_TRAIN_LBL_FILE: data/labels/real/union_train_labels.txt
-  VAL_LBL_FILE: data/labels/real/all_test_labels.txt
+  SOURCE_VAL_LBL_FILE: data/labels/synth/vis_test_labels.txt
+  TARGET_VAL_LBL_FILE: data/labels/real/all_test_labels.txt
 
 TRAIN:
   WEIGHT_DECAY: 0.0005
