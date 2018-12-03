@@ -31,11 +31,7 @@ def normalize(tensor, mean, std):
     return tensor
 
 
-def denormalize(tensor, mean=None, std=None):
-    if mean is None:
-        mean = [128., 128., 128.]
-    if std is None:
-        std = [256., 256., 256.]
+def denormalize(tensor, mean, std):
     for t, m, s in zip(tensor, mean, std):
         t.mul_(s).add_(m)
     return tensor

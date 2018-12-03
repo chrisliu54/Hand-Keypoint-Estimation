@@ -42,15 +42,15 @@ def main():
     ])
 
     # train
-    source_dset = HandKptDataset(config.DATA.SOURCE_TRAIN_DIR, config.DATA.SOURCE_TRAIN_LBL_FILE, 8,  # TODO: stride
+    source_dset = HandKptDataset(config.DATA.SOURCE.TRAIN.DIR, config.DATA.SOURCE.TRAIN.LBL_FILE, 8,  # TODO: stride
                                  transformer=train_transformer)
 
-    # target_dset = HandKptDataset(config.DATA.TARGET_TRAIN_DIR, config.DATA.TARGET_TRAIN_LBL_FILE, 8,
+    # target_dset = HandKptDataset(config.DATA.TARGET.TRAIN.DIR, config.DATA.TARGET.TRAIN.LBL_FILE, 8,
     #                              transformer=train_transformer)
 
-    source_val_dset = HandKptDataset(config.DATA.SOURCE_VAL_DIR, config.DATA.SOURCE_VAL_LBL_FILE, 8,
+    source_val_dset = HandKptDataset(config.DATA.SOURCE.VAL.DIR, config.DATA.SOURCE.VAL.LBL_FILE, 8,
                                      transformer=test_transformer)
-    target_val_dset = HandKptDataset(config.DATA.TARGET_VAL_DIR, config.DATA.TARGET_VAL_LBL_FILE, 8,
+    target_val_dset = HandKptDataset(config.DATA.TARGET.VAL.DIR, config.DATA.TARGET.VAL.LBL_FILE, 8,
                                      transformer=test_transformer)
 
     # source only
@@ -106,7 +106,8 @@ def main():
                 desc='Current epoch', ncols=80, leave=False):
 
             # adjust learning rate
-            learning_rate = adjust_learning_rate(optimizer, logger.global_step, config)
+            # learning_rate = adjust_learning_rate(optimizer, logger.global_step, config)
+            learning_rate = optimizer.param_groups[0]['lr']
 
             stu_inputs = stu_inputs.to(device)
             stu_heatmap = stu_heatmap.to(device)
@@ -138,8 +139,7 @@ def main():
                     'optim': optimizer.state_dict(),
                     'iter': logger.global_step,
                     'best_metric_val': logger.best_metric_val,
-                }, cur_metric_val=pck2)
-                # TODO: use only pck@0.2 may not OK
+                }, cur_metric_val=pck05)
 
             logger.step(1)
             total_progress_bar.update(1)

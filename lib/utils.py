@@ -120,6 +120,10 @@ def evaluate(model, loader, img_size, vis=False, logger=None, disp_interval=50, 
     tot_pnt = 0
     idx = 0
     domain_prefix = 'tgt' if is_target else 'src'
+
+    # dataset-specific statistics
+    mean = loader.dataset.mean
+    std = loader.dataset.std
     with torch.no_grad():
         for (inputs, *_, gt_kpts) in tqdm.tqdm(
                 loader, desc='Eval', total=len(loader), leave=False
@@ -142,7 +146,7 @@ def evaluate(model, loader, img_size, vis=False, logger=None, disp_interval=50, 
 
             if vis and idx % disp_interval == 0:
                 # take the first image of the current batch for visualization
-                denorm_img = denormalize(inputs[0])
+                denorm_img = denormalize(inputs[0], mean, std)
                 if show_gt:
                     vis_kpt(gt_pnts=gt_kpts[0, ..., :2], img=denorm_img,
                             save_name='{}_gt_kpt/{}'.format(domain_prefix, idx // disp_interval), logger=logger)
@@ -157,8 +161,9 @@ def evaluate(model, loader, img_size, vis=False, logger=None, disp_interval=50, 
         tot_nkpts[i] /= tot_pnt
     if is_target:
         # draw PCK curve
-        pck_line, = plt.plot(thresholds, tot_nkpts)
         plt.ylim(0, 1.)
+        plt.grid()
+        pck_line, = plt.plot(thresholds, tot_nkpts)
 
         logger.add_figure('tgt_PCK_curve', pck_line.figure)
 

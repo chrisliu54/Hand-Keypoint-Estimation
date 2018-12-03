@@ -21,7 +21,7 @@ def load_basic_info(root_dir, file_name, img_size):
             info = pickle.load(pf)
     else:
         with open(pk_file, 'wb') as pf:
-            imgs, kpts, scales = [[] for _ in range(3)]
+            imgs, img_names, kpts, scales = [[] for _ in range(4)]
             with open(file_name, 'r') as f:
                 for line in f:
                     img_name, kpt_info = line.split(' ')[0], line.split(' ')[1:]
@@ -36,22 +36,32 @@ def load_basic_info(root_dir, file_name, img_size):
                     h, w = img.shape[0], img.shape[1]
                     cur_kpt = np.transpose(np.array(kpt_info))  # (3 * 21)
                     try:
+                        # TODO: bug, do not calculate width
                         scale = (cur_kpt[1][cur_kpt[1] < h].max() -
                                  cur_kpt[1][cur_kpt[1] > 0].min() + 4) / img_size
                         scales.append(scale)
 
-                        imgs.append(img_name)
+                        imgs.append(img)
+                        img_names.append(img_name)
                         kpts.append(kpt_info)
                     except:
                         # neglect images whose x or y is out of range
                         print('Warning: label coordinates out of image size in ' + img_name)
+                mean, std = [], []
+                for i in range(3):
+                    val = np.concatenate([np.reshape(img[..., i], -1) for img in imgs])
+                    mean.append(np.mean(val))
+                    std.append(np.std(val))
+
                 info = {
-                    'imgs': imgs,
+                    'img_names': img_names,
                     'kpts': kpts,
-                    'scales': scales
+                    'scales': scales,
+                    'mean': mean,
+                    'std': std
                 }
                 pickle.dump(info, pf)
-    return info['imgs'], info['kpts'], info['scales']
+    return info['img_names'], info['kpts'], info['scales'], info['mean'], info['std']
 
 
 def gaussian_kernel(size_w, size_h, center_x, center_y, sigma):
@@ -71,7 +81,7 @@ class HandKptDataset(data.Dataset):
     """
 
     def __init__(self, root_dir, label_file, stride, transformer=None):
-        self.img_list, self.kpt_list, self.scale_list = \
+        self.img_list, self.kpt_list, self.scale_list, self.mean, self.std = \
             load_basic_info(root_dir, label_file, config.MODEL.IMG_SIZE)
 
         self.stride = stride
@@ -103,8 +113,7 @@ class HandKptDataset(data.Dataset):
             heat_map[heat_map < 0.0099] = 0
             heatmap[:, :, i] = heat_map
 
-        img = Mytransforms.normalize(Mytransforms.to_tensor(img), [128.0, 128.0, 128.0],
-                                     [256.0, 256.0, 256.0])
+        img = Mytransforms.normalize(Mytransforms.to_tensor(img), self.mean, self.std)
         heatmap = Mytransforms.to_tensor(heatmap)
         return img, heatmap, np.array(kpt)
 
