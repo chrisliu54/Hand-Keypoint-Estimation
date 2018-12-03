@@ -112,12 +112,12 @@ def evaluate(model, loader, img_size, vis=False, logger=None, disp_interval=50, 
 
     for i in range(len(tot_nkpts)):
         tot_nkpts[i] /= tot_pnt
-    if is_target:
-        # draw PCK curve
-        plt.ylim(0, 1.)
-        plt.grid()
-        pck_line, = plt.plot(thresholds, tot_nkpts)
 
-        logger.add_figure('tgt_PCK_curve', pck_line.figure)
+    # draw PCK curve
+    plt.ylim(0, 1.)
+    plt.grid()
+    pck_line, = plt.plot(thresholds, tot_nkpts)
+
+    logger.add_figure('{}_PCK_curve'.format(domain_prefix), pck_line.figure)
 
     return tot_nkpts[5], tot_nkpts[-1]
