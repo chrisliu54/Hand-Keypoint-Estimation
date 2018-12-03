@@ -12,7 +12,7 @@ from lib.logger import Logger
 from lib.model import pose_resnet
 from lib.model.adv import *
 from lib.options import config
-from lib.utils import evaluate, adjust_learning_rate
+from lib.utils import evaluate
 
 
 def main():
@@ -42,16 +42,16 @@ def main():
     ])
 
     # train
-    source_dset = HandKptDataset(config.DATA.SOURCE.TRAIN.DIR, config.DATA.SOURCE.TRAIN.LBL_FILE, 8,  # TODO: stride
-                                 transformer=train_transformer)
+    source_dset = HandKptDataset(config.DATA.SOURCE.TRAIN.DIR, config.DATA.SOURCE.TRAIN.LBL_FILE,
+                                 stride=config.MODEL.HEATMAP_STRIDE, transformer=train_transformer)
 
-    # target_dset = HandKptDataset(config.DATA.TARGET.TRAIN.DIR, config.DATA.TARGET.TRAIN.LBL_FILE, 8,
-    #                              transformer=train_transformer)
+    # target_dset = HandKptDataset(config.DATA.TARGET.TRAIN.DIR, config.DATA.TARGET.TRAIN.LBL_FILE,
+    #                              stride=config.MODEL.HEATMAP_STRIDE, transformer=train_transformer)
 
-    source_val_dset = HandKptDataset(config.DATA.SOURCE.VAL.DIR, config.DATA.SOURCE.VAL.LBL_FILE, 8,
-                                     transformer=test_transformer)
-    target_val_dset = HandKptDataset(config.DATA.TARGET.VAL.DIR, config.DATA.TARGET.VAL.LBL_FILE, 8,
-                                     transformer=test_transformer)
+    source_val_dset = HandKptDataset(config.DATA.SOURCE.VAL.DIR, config.DATA.SOURCE.VAL.LBL_FILE,
+                                     stride=config.MODEL.HEATMAP_STRIDE, transformer=test_transformer)
+    target_val_dset = HandKptDataset(config.DATA.TARGET.VAL.DIR, config.DATA.TARGET.VAL.LBL_FILE,
+                                     stride=config.MODEL.HEATMAP_STRIDE, transformer=test_transformer)
 
     # source only
     train_loader = torch.utils.data.DataLoader(
@@ -97,17 +97,15 @@ def main():
 
     criterion = nn.SmoothL1Loss(size_average=False, reduce=False).to(device)
 
-    total_progress_bar = tqdm.tqdm(desc='Train iter', total=config.TRAIN.MAX_ITER, initial=config.TRAIN.START_ITERS)
+    total_progress_bar = tqdm.tqdm(desc='Train iter', ncols=80,
+                                   total=config.TRAIN.MAX_ITER,
+                                   initial=config.TRAIN.START_ITERS)
     epoch = 0
 
     while logger.global_step < config.TRAIN.MAX_ITER:
         for (stu_inputs, stu_heatmap, _) in tqdm.tqdm(
                 train_loader, total=len(train_loader),
                 desc='Current epoch', ncols=80, leave=False):
-
-            # adjust learning rate
-            # learning_rate = adjust_learning_rate(optimizer, logger.global_step, config)
-            learning_rate = optimizer.param_groups[0]['lr']
 
             stu_inputs = stu_inputs.to(device)
             stu_heatmap = stu_heatmap.to(device)
@@ -146,7 +144,6 @@ def main():
 
             # log
             logger.add_scalar('regress_loss', loss.item())
-            logger.add_scalar('lr', learning_rate)
 
         epoch += 1
 
