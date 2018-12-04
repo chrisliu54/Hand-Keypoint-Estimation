@@ -1,5 +1,3 @@
-import math
-
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -8,51 +6,6 @@ import tqdm
 plt.switch_backend('agg')
 from lib.Mytransforms import denormalize
 from lib.visualization import vis_kpt
-
-
-def adjust_learning_rate(optimizer, iters, config):
-    base_lr = config.TRAIN.BASE_LR
-    policy = config.TRAIN.LR_POLICY
-    policy_parameter = config.TRAIN.POLICY_PARAMETER
-    if policy == 'fixed':
-        lr = base_lr
-    elif policy == 'step':
-        lr = base_lr * (policy_parameter['GAMMA'] ** (iters // policy_parameter['STEP_SIZE']))
-    elif policy == 'exp':
-        lr = base_lr * (policy_parameter['GAMMA'] ** iters)
-    elif policy == 'inv':
-        lr = base_lr * ((1 + policy_parameter['GAMMA'] * iters) ** (-policy_parameter['POWER']))
-    elif policy == 'multistep':
-        lr = base_lr
-        for stepvalue in policy_parameter['STEPVALUE']:
-            if iters >= stepvalue:
-                lr *= policy_parameter['GAMMA']
-            else:
-                break
-    elif policy == 'poly':
-        lr = base_lr * ((1 - iters * 1.0 / policy_parameter['MAX_ITER']) ** policy_parameter['POWER'])
-    elif policy == 'sigmoid':
-        lr = base_lr * (1.0 / (1 + math.exp(-policy_parameter['GAMMA'] * (iters - policy_parameter['STEPSIZE']))))
-    elif policy == 'multistep-poly':
-        lr = base_lr
-        stepstart = 0
-        stepend = policy_parameter['MAX_ITER']
-        for stepvalue in policy_parameter['STEPVALUE']:
-            if iters >= stepvalue:
-                lr *= policy_parameter['GAMMA']
-                stepstart = stepvalue
-            else:
-                stepend = stepvalue
-                break
-        lr = max(lr * policy_parameter['GAMMA'],
-                 lr * (1 - (iters - stepstart) * 1.0 / (stepend - stepstart)) ** policy_parameter['POWER'])
-
-    if lr >= config.TRAIN.MIN_LR:
-        for i, param_group in enumerate(optimizer.param_groups):
-            param_group['lr'] = lr
-        return lr
-    else:
-        return optimizer.param_groups[0]['lr']  # old lr
 
 
 def PCK(pred, gt, img_side_len, alpha=0.2):
@@ -126,7 +79,7 @@ def evaluate(model, loader, img_size, vis=False, logger=None, disp_interval=50, 
     std = loader.dataset.std
     with torch.no_grad():
         for (inputs, *_, gt_kpts) in tqdm.tqdm(
-                loader, desc='Eval', total=len(loader), leave=False
+                loader, desc='Eval {}'.format(domain_prefix), ncols=80, total=len(loader), leave=False
         ):
 
             img_side_len = img_size
@@ -159,12 +112,12 @@ def evaluate(model, loader, img_size, vis=False, logger=None, disp_interval=50, 
 
     for i in range(len(tot_nkpts)):
         tot_nkpts[i] /= tot_pnt
-    if is_target:
-        # draw PCK curve
-        plt.ylim(0, 1.)
-        plt.grid()
-        pck_line, = plt.plot(thresholds, tot_nkpts)
 
-        logger.add_figure('tgt_PCK_curve', pck_line.figure)
+    # draw PCK curve
+    plt.ylim(0, 1.)
+    plt.grid()
+    pck_line, = plt.plot(thresholds, tot_nkpts)
+
+    logger.add_figure('{}_PCK_curve'.format(domain_prefix), pck_line.figure)
 
     return tot_nkpts[5], tot_nkpts[-1]
