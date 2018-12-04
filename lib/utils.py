@@ -79,7 +79,7 @@ def evaluate(model, loader, img_size, vis=False, logger=None, disp_interval=50, 
     std = loader.dataset.std
     with torch.no_grad():
         for (inputs, *_, gt_kpts) in tqdm.tqdm(
-                loader, desc='Eval', ncols=80, total=len(loader), leave=False
+                loader, desc='Eval {}'.format(domain_prefix), ncols=80, total=len(loader), leave=False
         ):
 
             img_side_len = img_size
