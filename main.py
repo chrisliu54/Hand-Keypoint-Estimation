@@ -95,7 +95,7 @@ def main():
         print("=> validate pck@0.05 = {}, pck@0.2 = {}".format(pck05 * 100, pck2 * 100))
         return
 
-    criterion = nn.SmoothL1Loss(size_average=False, reduce=False).to(device)
+    criterion = nn.SmoothL1Loss(reduction='none').to(device)
 
     total_progress_bar = tqdm.tqdm(desc='Train iter', ncols=80,
                                    total=config.TRAIN.MAX_ITER,
