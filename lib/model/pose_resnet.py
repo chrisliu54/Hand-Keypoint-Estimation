@@ -208,7 +208,7 @@ class PoseResNet(nn.Module):
         assert num_layers == len(num_filters), \
             'ERROR: num_deconv_layers is different len(num_deconv_filters)'
         assert num_layers == len(num_kernels), \
-            'ERROR: num_deconv_layers is different len(num_deconv_filters)'
+            'ERROR: num_deconv_layers is different len(num_deconv_kernels)'
 
         layers = []
         for i in range(num_layers):
