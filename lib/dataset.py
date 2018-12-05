@@ -21,7 +21,12 @@ def load_basic_info(root_dir, file_name, img_size):
             info = pickle.load(pf)
     else:
         with open(pk_file, 'wb') as pf:
-            imgs, img_names, kpts, scales = [[] for _ in range(4)]
+            img_names, kpts, scales = [[] for _ in range(3)]
+
+            # BGR
+            cnt = 0
+            mean = [0, 0, 0]
+            mean_squared = [0, 0, 0]
             with open(file_name, 'r') as f:
                 for line in f:
                     img_name, kpt_info = line.split(' ')[0], line.split(' ')[1:]
@@ -41,17 +46,19 @@ def load_basic_info(root_dir, file_name, img_size):
                                  cur_kpt[1][cur_kpt[1] > 0].min() + 4) / img_size
                         scales.append(scale)
 
-                        imgs.append(img)
+                        cur_npix = img.shape[0] * img.shape[1]
+                        for i in range(3):
+                            cur_channel = np.reshape(img[..., i], -1).astype(np.float32)
+                            mean[i] = (mean[i]*cnt + cur_channel.sum()) / (cnt + cur_npix)
+                            mean_squared[i] = (mean_squared[i]*cnt + (cur_channel**2).sum()) / (cnt + cur_npix)
+                        cnt += cur_npix
+
                         img_names.append(img_name)
                         kpts.append(kpt_info)
                     except:
                         # neglect images whose x or y is out of range
                         print('Warning: label coordinates out of image size in ' + img_name)
-                mean, std = [], []
-                for i in range(3):
-                    val = np.concatenate([np.reshape(img[..., i], -1) for img in imgs])
-                    mean.append(np.mean(val))
-                    std.append(np.std(val))
+                std = [(ms - m**2)**0.5 for ms, m in zip(mean_squared, mean)]
 
                 info = {
                     'img_names': img_names,

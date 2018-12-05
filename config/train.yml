@@ -28,7 +28,7 @@ DATA:
 TRAIN:
   WEIGHT_DECAY: 0.0005
   MAX_ITER: 16000
-  BATCH_SIZE: 128
+  BATCH_SIZE: 32
   
   BASE_LR: 0.0001
   START_ITERS: 0
@@ -48,6 +48,18 @@ MODEL:
     - 4
     - 4
   FINAL_CONV_KERNEL: 1
+
+JAN:
+  ADV_WEIGHT: 1.0
+  KERNEL_MULS:
+    - 2.0
+    - 2.0
+  KERNEL_NUMS:
+    - 2
+    - 1
+  FIX_SIGMA_LIST:
+    -
+    -
 
 MISC:
   WORKERS: 4

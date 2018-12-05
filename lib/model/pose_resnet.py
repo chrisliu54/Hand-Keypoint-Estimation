@@ -243,9 +243,10 @@ class PoseResNet(nn.Module):
         x = self.layer4(x)
 
         x = self.deconv_layers(x)
+        feat = x
         x = self.final_layer(x)
 
-        return x
+        return feat, x
 
     def init_weights(self, checkpoint):
         logger.info('=> init deconv weights from normal distribution')

@@ -86,7 +86,7 @@ def evaluate(model, loader, img_size, vis=False, logger=None, disp_interval=50, 
             inputs = inputs.to(device)
 
             # get head_maps for one image
-            heats = model(inputs)
+            _, heats = model(inputs)
 
             # get predicted key points
             kpts = get_kpts(heats, img_h=img_side_len, img_w=img_side_len)

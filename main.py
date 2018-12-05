@@ -10,6 +10,7 @@ from lib import Mytransforms
 from lib.dataset import HandKptDataset
 from lib.logger import Logger
 from lib.model import pose_resnet
+from lib.model.jan import JAN
 from lib.model.adv import *
 from lib.options import config
 from lib.utils import evaluate
@@ -45,19 +46,24 @@ def main():
     source_dset = HandKptDataset(config.DATA.SOURCE.TRAIN.DIR, config.DATA.SOURCE.TRAIN.LBL_FILE,
                                  stride=config.MODEL.HEATMAP_STRIDE, transformer=train_transformer)
 
-    # target_dset = HandKptDataset(config.DATA.TARGET.TRAIN.DIR, config.DATA.TARGET.TRAIN.LBL_FILE,
-    #                              stride=config.MODEL.HEATMAP_STRIDE, transformer=train_transformer)
+    target_dset = HandKptDataset(config.DATA.TARGET.TRAIN.DIR, config.DATA.TARGET.TRAIN.LBL_FILE,
+                                 stride=config.MODEL.HEATMAP_STRIDE, transformer=train_transformer)
 
     source_val_dset = HandKptDataset(config.DATA.SOURCE.VAL.DIR, config.DATA.SOURCE.VAL.LBL_FILE,
                                      stride=config.MODEL.HEATMAP_STRIDE, transformer=test_transformer)
     target_val_dset = HandKptDataset(config.DATA.TARGET.VAL.DIR, config.DATA.TARGET.VAL.LBL_FILE,
                                      stride=config.MODEL.HEATMAP_STRIDE, transformer=test_transformer)
 
-    # source only
-    train_loader = torch.utils.data.DataLoader(
+    # train
+    source_loader = torch.utils.data.DataLoader(
         source_dset,
         batch_size=config.TRAIN.BATCH_SIZE, shuffle=True,
         num_workers=config.MISC.WORKERS, pin_memory=True)
+    target_loader = torch.utils.data.DataLoader(
+        target_dset,
+        batch_size=config.TRAIN.BATCH_SIZE, shuffle=True,
+        num_workers=config.MISC.WORKERS, pin_memory=True)
+
 
     # val
     source_val_loader = torch.utils.data.DataLoader(
@@ -103,16 +109,34 @@ def main():
     epoch = 0
 
     while logger.global_step < config.TRAIN.MAX_ITER:
-        for (stu_inputs, stu_heatmap, _) in tqdm.tqdm(
-                train_loader, total=len(train_loader),
+        for (source_data, target_data) in tqdm.tqdm(
+                zip(source_loader, target_loader),
+                total=min(len(source_loader), len(target_loader)),
                 desc='Current epoch', ncols=80, leave=False):
 
-            stu_inputs = stu_inputs.to(device)
-            stu_heatmap = stu_heatmap.to(device)
+            source_inputs, source_heats, _ = source_data
+            target_inputs, *_ = target_data
 
-            stu_heats = net(stu_inputs)
+            # data preparation
+            source_inputs = source_inputs.to(device)
+            source_heats = source_heats.to(device)
 
-            loss = criterion(stu_heats, stu_heatmap).sum() / stu_inputs.size(0)
+            target_inputs = target_inputs.to(device)
+
+            source_size = source_inputs.size(0)
+            union_inputs = torch.cat([source_inputs, target_inputs], dim=0)
+
+            # forward
+            union_feats, union_preds = net(union_inputs)
+
+            # calc loss
+            regress_loss = criterion(union_preds[:source_size], source_heats).sum() / source_inputs.size(0)
+            jan_loss = JAN(source_list=[union_feats[:source_size], union_preds[:source_size]],
+                           target_list=[union_feats[source_size:], union_preds[source_size:]],
+                           kernel_muls=config.JAN.KERNEL_MULS,
+                           kernel_nums=config.JAN.KERNEL_NUMS,
+                           fix_sigma_list=config.JAN.FIX_SIGMA_LIST)
+            loss = regress_loss + config.JAN.ADV_WEIGHT * jan_loss
 
             optimizer.zero_grad()
             loss.backward()
@@ -143,7 +167,9 @@ def main():
             total_progress_bar.update(1)
 
             # log
-            logger.add_scalar('regress_loss', loss.item())
+            logger.add_scalar('regress_loss', regress_loss.item())
+            logger.add_scalar('jan_loss', jan_loss.item())
+            logger.add_scalar('loss', loss.item())
 
         epoch += 1
 
