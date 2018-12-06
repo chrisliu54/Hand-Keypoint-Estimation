@@ -51,7 +51,7 @@ def get_kpts(maps, img_h=368.0, img_w=368.0):
     return torch.from_numpy(np.array(all_kpts))
 
 
-def evaluate(model, loader, img_size, vis=False, logger=None, disp_interval=50, show_gt=True, is_target=True):
+def evaluate(model, loader, img_size, vis=False, logger=None, disp_interval=50, show_gt=True, prefix=""):
     """
     :param img_size: width/height of img_size (width == height)
     :param vis: show kpts on images or not
@@ -72,14 +72,13 @@ def evaluate(model, loader, img_size, vis=False, logger=None, disp_interval=50, 
     tot_nkpts = [0] * thresholds.shape[0]
     tot_pnt = 0
     idx = 0
-    domain_prefix = 'tgt' if is_target else 'src'
 
     # dataset-specific statistics
     mean = loader.dataset.mean
     std = loader.dataset.std
     with torch.no_grad():
         for (inputs, *_, gt_kpts) in tqdm.tqdm(
-                loader, desc='Eval {}'.format(domain_prefix), ncols=80, total=len(loader), leave=False
+                loader, desc='Eval {}'.format(prefix), ncols=80, total=len(loader), leave=False
         ):
 
             img_side_len = img_size
@@ -102,9 +101,9 @@ def evaluate(model, loader, img_size, vis=False, logger=None, disp_interval=50, 
                 denorm_img = denormalize(inputs[0], mean, std)
                 if show_gt:
                     vis_kpt(gt_pnts=gt_kpts[0, ..., :2], img=denorm_img,
-                            save_name='{}_gt_kpt/{}'.format(domain_prefix, idx // disp_interval), logger=logger)
+                            save_name='{}_gt_kpt/{}'.format(prefix, idx // disp_interval), logger=logger)
                 vis_kpt(pred_pnts=kpts[0], img=denorm_img,
-                        save_name='{}_pred_kpt/{}'.format(domain_prefix, idx // disp_interval), logger=logger)
+                        save_name='{}_pred_kpt/{}'.format(prefix, idx // disp_interval), logger=logger)
             idx += 1
 
     # recover the state
@@ -118,6 +117,6 @@ def evaluate(model, loader, img_size, vis=False, logger=None, disp_interval=50, 
     plt.grid()
     pck_line, = plt.plot(thresholds, tot_nkpts)
 
-    logger.add_figure('{}_PCK_curve'.format(domain_prefix), pck_line.figure)
+    logger.add_figure('{}_PCK_curve'.format(prefix), pck_line.figure)
 
     return tot_nkpts[5], tot_nkpts[-1]
