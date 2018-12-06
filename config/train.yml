@@ -33,6 +33,11 @@ TRAIN:
   BASE_LR: 0.0001
   START_ITERS: 0
 
+  # for adv
+  ADV_LR: 0.0001
+  ADV_WEIGHT: 0.1
+
+
 MODEL:
   RESUME: ""
   PRETRAINED: True

@@ -72,12 +72,12 @@ class DCDiscriminator(nn.Module):
     def __init__(self, input_nc, ndf=64, use_sigmoid=True):
         super(DCDiscriminator, self).__init__()
 
-        # self.grl_layer = GradientReverseLayer()
         self.conv1 = nn.Conv2d(input_nc, ndf, kernel_size=4, stride=2, padding=1)
         self.conv2 = nn.Conv2d(ndf, ndf * 2, kernel_size=4, stride=2, padding=1)
         self.conv3 = nn.Conv2d(ndf * 2, ndf * 4, kernel_size=4, stride=2, padding=1)
-        self.conv4 = nn.Conv2d(ndf * 4, ndf * 8, kernel_size=4, stride=2, padding=1)
-        self.classifier = nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=2, padding=1)
+        # self.conv4 = nn.Conv2d(ndf * 4, ndf * 8, kernel_size=4, stride=2, padding=1)
+        # self.classifier = nn.Conv2d(ndf * 4, 1, kernel_size=4, stride=2, padding=1)
+        self.classifier = nn.Conv2d(ndf * 4, 1, kernel_size=1, stride=1)
         self.leaky_relu = nn.LeakyReLU(negative_slope=0.2, inplace=True)
         self.sigmoid = nn.Sigmoid()
         self.use_sigmoid = use_sigmoid
@@ -87,7 +87,7 @@ class DCDiscriminator(nn.Module):
         x = self.leaky_relu(self.conv1(x))
         x = self.leaky_relu(self.conv2(x))
         x = self.leaky_relu(self.conv3(x))
-        x = self.leaky_relu(self.conv4(x))
+        # x = self.leaky_relu(self.conv4(x))
         x = self.classifier(x)
         if self.use_sigmoid:
             x = self.sigmoid(x)
