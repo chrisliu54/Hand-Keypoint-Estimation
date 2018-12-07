@@ -5,6 +5,7 @@ import numpy as np
 import cv2
 from PIL import Image
 from io import BytesIO
+from sklearn.manifold import TSNE
 
 
 def vis_kpt(gt_pnts=None, pred_pnts=None, img=None, save_name='kpt', logger=None):
@@ -79,3 +80,28 @@ def vis_kpt(gt_pnts=None, pred_pnts=None, img=None, save_name='kpt', logger=None
 
     # plt.savefig('/tmp/kpt.png', bbox_inches='tight')
     plt.close(fig)
+
+
+def visualize_TSNE(data, logger, figsize=(8, 8)):
+    """
+    :param data: (2*N, C, H, W), stacked using [source, target] order
+    :param logger: Logger obj in lib.logger
+    :param figsize: figsize for visualization
+    :return:
+    """
+    n_samples = data.shape[0]
+    data = data.view(n_samples, -1)
+    data2d = TSNE(n_components=2, random_state=1234).fit_transform(data.cpu().numpy())
+
+    fig = plt.figure(figsize=figsize)
+    plt.grid()
+
+    color = ['blue', 'crimson']
+
+    plt.scatter(data2d[:n_samples // 2, 0], data2d[:n_samples // 2, 1],
+                marker='o', color=color[0], linewidths='1', alpha=0.8, label='source')
+    plt.scatter(data2d[n_samples // 2:, 0], data2d[n_samples // 2:, 1],
+                marker='o', color=color[1], linewidths='1', alpha=0.8, label='target')
+    plt.legend(loc='best')
+
+    logger.add_figure('feat_emd', fig)
