@@ -38,8 +38,7 @@ def sigmoid_rampup(current, rampup_length):
 
 
 def get_current_consistency_weight(n_iter):
-    return config.TRAIN.CONSISTENCY * sigmoid_rampup(n_iter, config.TRAIN.CONSISTENCY_RAMPUP)
-    # return min(config.consistency * ramps.sigmoid_rampup(epoch, config.consistency_rampup), 1)
+    return config.TRAIN.CONSISTENCY_WEIGHT * sigmoid_rampup(n_iter, config.TRAIN.CONSISTENCY_RAMPUP)
 
 
 def update_ema_variables(model, ema_model, alpha, global_step):
@@ -116,7 +115,8 @@ def main():
         print("=> loading checkpoint '{}'".format(config.MODEL.RESUME))
         resume_ckpt = torch.load(config.MODEL.RESUME)
         net.load_state_dict(resume_ckpt['net'])
-        ema_net.load_state_dict(resume_ckpt['ema_net'])
+        if 'ema_net' in resume_ckpt.keys():
+            ema_net.load_state_dict(resume_ckpt['ema_net'])
         optimizer.load_state_dict(resume_ckpt['optim'])
         config.TRAIN.START_ITERS = resume_ckpt['iter']
         logger.global_step = resume_ckpt['iter']
@@ -138,59 +138,59 @@ def main():
                                    initial=config.TRAIN.START_ITERS)
 
     while logger.global_step < config.TRAIN.MAX_ITER:
-        for (source_data, target_data) in train_gen:
+        source_data, target_data = next(train_gen)
 
-            net.train()
-            ema_net.train()
+        net.train()
+        ema_net.train()
 
-            source_inputs, source_heatmap, _ = [x.to(device) for x in source_data]
-            target_inputs, target_heatmap, _ = [x.to(device) for x in target_data]
+        source_inputs, source_heatmap, _ = [x.to(device) for x in source_data]
+        target_inputs, target_heatmap, _ = [x.to(device) for x in target_data]
 
-            inputs = torch.cat([source_inputs, target_inputs])
+        inputs = torch.cat([source_inputs, target_inputs])
 
-            pred_heatmap = net(inputs)
-            regression_loss = criterion(pred_heatmap[:config.TRAIN.SOURCE_BATCH_SIZE], source_heatmap).sum() / config.TRAIN.SOURCE_BATCH_SIZE
+        pred_heatmap = net(inputs)
+        regression_loss = criterion(pred_heatmap[:config.TRAIN.SOURCE_BATCH_SIZE], source_heatmap).sum() / config.TRAIN.SOURCE_BATCH_SIZE
 
-            # ema
-            ema_pred_heatmap = ema_net(inputs).detach()
-            cons_loss = cons_criterion(pred_heatmap, ema_pred_heatmap).sum() / config.TRAIN.BATCH_SIZE
+        # ema
+        ema_pred_heatmap = ema_net(inputs).detach()
+        cons_loss = cons_criterion(pred_heatmap, ema_pred_heatmap).sum() / config.TRAIN.BATCH_SIZE
 
-            cons_weight = get_current_consistency_weight(logger.global_step)
-            loss = regression_loss + cons_weight * cons_loss
+        cons_weight = get_current_consistency_weight(logger.global_step)
+        loss = regression_loss + cons_weight * cons_loss
 
-            logger.add_scalar('cons_weight', cons_weight)
-            logger.add_scalar('cons_loss', cons_loss)
-            logger.add_scalar('loss', loss)
+        logger.add_scalar('cons_weight', cons_weight)
+        logger.add_scalar('cons_loss', cons_loss)
+        logger.add_scalar('loss', loss)
 
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            update_ema_variables(net, ema_net, config.TRAIN.EMA_DECAY, logger.global_step)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        update_ema_variables(net, ema_net, config.TRAIN.EMA_DECAY, logger.global_step)
 
-            # val
-            if logger.global_step % config.MISC.TEST_INTERVAL == 0:
-                for model, model_name in [(net, 'student'), (ema_net, 'teacher')]:
-                    for dataloader, loader_name in [(source_val_loader, 'source'), (target_val_loader, 'target')]:
-                        prefix = "{}_{}".format(model_name, loader_name)
-                        pck05, pck2 = evaluate(model, dataloader, img_size=config.MODEL.IMG_SIZE,
-                                               logger=logger, disp_interval=config.MISC.DISP_INTERVAL,
-                                               show_gt=(logger.global_step == 0), vis=True, prefix=prefix)
-                        logger.add_scalar('{}_pck@0.05'.format(prefix), pck05 * 100)
-                        logger.add_scalar('{}_pck@0.2'.format(prefix), pck2 * 100)
+        # val
+        if logger.global_step % config.MISC.TEST_INTERVAL == 0:
+            for model, model_name in [(net, 'student'), (ema_net, 'teacher')]:
+                for dataloader, loader_name in [(source_val_loader, 'source'), (target_val_loader, 'target')]:
+                    prefix = "{}_{}".format(model_name, loader_name)
+                    pck05, pck2 = evaluate(model, dataloader, img_size=config.MODEL.IMG_SIZE,
+                                           logger=logger, disp_interval=config.MISC.DISP_INTERVAL,
+                                           show_gt=(logger.global_step == 0), vis=True, prefix=prefix)
+                    logger.add_scalar('{}_pck@0.05'.format(prefix), pck05 * 100)
+                    logger.add_scalar('{}_pck@0.2'.format(prefix), pck2 * 100)
 
-                # use teacher target pck results as main metric
-                logger.save_ckpt(state={
-                    'net': net.module.state_dict(),
-                    'optim': optimizer.state_dict(),
-                    'iter': logger.global_step,
-                    'best_metric_val': logger.best_metric_val,
-                }, cur_metric_val=pck05)
+            # use teacher target pck results as main metric
+            logger.save_ckpt(state={
+                'net': net.module.state_dict(),
+                'optim': optimizer.state_dict(),
+                'iter': logger.global_step,
+                'best_metric_val': logger.best_metric_val,
+            }, cur_metric_val=pck05)
 
-            logger.step(1)
-            total_progress_bar.update(1)
+        logger.step(1)
+        total_progress_bar.update(1)
 
-            # log
-            logger.add_scalar('regress_loss', loss.item())
+        # log
+        logger.add_scalar('regress_loss', loss.item())
 
     total_progress_bar.close()
 
