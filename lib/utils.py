@@ -130,7 +130,7 @@ def evaluate(base_net, loader, img_size, pred_net_1=None, pred_net_2=None, statu
 
     # recover the state
     for state, net in zip(previous_states, nets):
-        net.tran(state)
+        net.train(state)
 
     for i in range(len(tot_nkpts)):
         tot_nkpts[i] /= tot_pnt

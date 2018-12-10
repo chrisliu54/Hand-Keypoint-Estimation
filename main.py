@@ -209,8 +209,8 @@ def main():
 
             # val
             if logger.global_step % config.MISC.TEST_INTERVAL == 0:
-                val_loader = [{'src': source_loader},
-                              {'tgt': target_loader}]
+                val_loader = [{'src': source_val_loader},
+                              {'tgt': target_val_loader}]
                 pred_nets = [{'pred_net_1': pred_net_1, 'pred_net_2': None, 'status': 'PRED_NET_1'},
                              {'pred_net_1': None, 'pred_net_2': pred_net_2, 'status': 'PRED_NET_2'},
                              {'pred_net_1': pred_net_1, 'pred_net_2': pred_net_2, 'status': 'AVG'}]
@@ -221,8 +221,8 @@ def main():
                                                logger=logger, disp_interval=config.MISC.DISP_INTERVAL,
                                                show_gt=(logger.global_step == 0), is_target=(domain == 'tgt'),
                                                **net_dict)
-                        logger.add_scalar('{}_pck@0.05'.format(domain), pck05 * 100)
-                        logger.add_scalar('{}_pck@0.2'.format(domain), pck2 * 100)
+                        logger.add_scalar('{}_{}_pck@0.05'.format(domain, net_dict['status']), pck05 * 100)
+                        logger.add_scalar('{}_{}_pck@0.2'.format(domain, net_dict['status']), pck2 * 100)
                         if domain == 'tgt':
                             logger.save_ckpt(state={
                                 'base_net': base_net.module.state_dict(),
