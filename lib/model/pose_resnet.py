@@ -144,22 +144,13 @@ class Bottleneck_CAFFE(nn.Module):
         return out
 
 
-class PoseResNet(nn.Module):
+class PosePredictor(nn.Module):
 
-    def __init__(self, block, layers, cfg):
-        self.inplanes = 64
-        super(PoseResNet, self).__init__()
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=1, padding=3,
-                               bias=False)
-        self.bn1 = nn.BatchNorm2d(64, momentum=BN_MOMENTUM)
-        self.relu = nn.ReLU(inplace=True)
-        # self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.layer1 = self._make_layer(block, 64, layers[0])
-        self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
+    def __init__(self, cfg):
+        super(PosePredictor, self).__init__()
 
         # used for deconv layers
+        self.inplanes = 512
         self.deconv_layers = self._make_deconv_layer(
             cfg.MODEL.NUM_DECONV_LAYERS,
             cfg.MODEL.NUM_DECONV_FILTERS,
@@ -174,22 +165,7 @@ class PoseResNet(nn.Module):
             padding=1 if cfg.MODEL.FINAL_CONV_KERNEL == 3 else 0
         )
 
-    def _make_layer(self, block, planes, blocks, stride=1):
-        downsample = None
-        if stride != 1 or self.inplanes != planes * block.expansion:
-            downsample = nn.Sequential(
-                nn.Conv2d(self.inplanes, planes * block.expansion,
-                          kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(planes * block.expansion, momentum=BN_MOMENTUM),
-            )
-
-        layers = []
-        layers.append(block(self.inplanes, planes, stride, downsample))
-        self.inplanes = planes * block.expansion
-        for i in range(1, blocks):
-            layers.append(block(self.inplanes, planes))
-
-        return nn.Sequential(*layers)
+        self.init_weights()
 
     def _get_deconv_cfg(self, deconv_kernel):
         if deconv_kernel == 4:
@@ -232,22 +208,12 @@ class PoseResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        # x = self.maxpool(x)
-
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
-
         x = self.deconv_layers(x)
         x = self.final_layer(x)
 
         return x
 
-    def init_weights(self, checkpoint):
+    def init_weights(self):
         logger.info('=> init deconv weights from normal distribution')
         for name, m in self.deconv_layers.named_modules():
             if isinstance(m, nn.ConvTranspose2d):
@@ -268,6 +234,53 @@ class PoseResNet(nn.Module):
                 nn.init.normal_(m.weight, std=0.001)
                 nn.init.constant_(m.bias, 0)
 
+
+class PoseResNet(nn.Module):
+
+    def __init__(self, block, layers):
+        self.inplanes = 64
+        super(PoseResNet, self).__init__()
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=1, padding=3,
+                               bias=False)
+        self.bn1 = nn.BatchNorm2d(64, momentum=BN_MOMENTUM)
+        self.relu = nn.ReLU(inplace=True)
+        # self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.layer1 = self._make_layer(block, 64, layers[0])
+        self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
+        self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
+        self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
+
+    def _make_layer(self, block, planes, blocks, stride=1):
+        downsample = None
+        if stride != 1 or self.inplanes != planes * block.expansion:
+            downsample = nn.Sequential(
+                nn.Conv2d(self.inplanes, planes * block.expansion,
+                          kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(planes * block.expansion, momentum=BN_MOMENTUM),
+            )
+
+        layers = []
+        layers.append(block(self.inplanes, planes, stride, downsample))
+        self.inplanes = planes * block.expansion
+        for i in range(1, blocks):
+            layers.append(block(self.inplanes, planes))
+
+        return nn.Sequential(*layers)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        # x = self.maxpool(x)
+
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+
+        return x
+
+    def init_weights(self, checkpoint):
         if isinstance(checkpoint, OrderedDict):
             state_dict = checkpoint
         elif isinstance(checkpoint, dict) and 'state_dict' in checkpoint:
@@ -299,10 +312,12 @@ def get_pose_net(cfg):
 
     block_class, layers = resnet_spec[num_layers]
 
-    model = PoseResNet(block_class, layers, cfg)
+    base_net = PoseResNet(block_class, layers)
+    pred_net_1 = PosePredictor(cfg)
+    pred_net_2 = PosePredictor(cfg)
 
     if cfg.MODEL.PRETRAINED:
         checkpoint = load_url(model_urls['resnet{}'.format(cfg.MODEL.NUM_LAYERS)])
-        model.init_weights(checkpoint)
+        base_net.init_weights(checkpoint)
 
-    return model
+    return base_net, pred_net_1, pred_net_2
