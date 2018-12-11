@@ -83,10 +83,11 @@ def main():
         print("=> loading checkpoint '{}'".format(config.MODEL.RESUME))
         resume_ckpt = torch.load(config.MODEL.RESUME)
         net.load_state_dict(resume_ckpt['net'])
-        optimizer.load_state_dict(resume_ckpt['optim'])
-        config.TRAIN.START_ITERS = resume_ckpt['iter']
-        logger.global_step = resume_ckpt['iter']
-        logger.best_metric_val = resume_ckpt['best_metric_val']
+        if config.TRAIN.RESUME_OPTIMIZER:
+            optimizer.load_state_dict(resume_ckpt['optim'])
+            config.TRAIN.START_ITERS = resume_ckpt['iter']
+            logger.global_step = resume_ckpt['iter']
+            logger.best_metric_val = resume_ckpt['best_metric_val']
     net = torch.nn.DataParallel(net)
 
     if config.EVALUATE:
@@ -119,7 +120,7 @@ def main():
             optimizer.step()
 
             # val
-            if logger.global_step % config.MISC.TEST_INTERVAL == 0:
+            if (logger.global_step + 1) % config.MISC.TEST_INTERVAL == 0:
                 pck05, pck2 = evaluate(net, source_val_loader, img_size=config.MODEL.IMG_SIZE, vis=True,
                                        logger=logger, disp_interval=config.MISC.DISP_INTERVAL,
                                        show_gt=(logger.global_step == 0), is_target=False)

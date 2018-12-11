@@ -1,5 +1,5 @@
 # project
-PROJ_NAME: pos-resnet34
+PROJ_NAME: pos-resnet34-real-finetune
 
 EVALUATE: False
 
@@ -11,8 +11,8 @@ DATA:
 
   SOURCE:
     TRAIN:
-      DIR: data/images/union/synth
-      LBL_FILE: data/labels/synth/union_train_labels.txt
+      DIR: data/images/CMU_Panoptic/hand_labels/manual_train 
+      LBL_FILE: data/labels/real/all_train_labels.txt
     VAL:
       DIR: data/images/CMU_Panoptic/hand_labels_synth/all_synth
       LBL_FILE: data/labels/synth/vis_test_labels.txt
@@ -33,10 +33,10 @@ TRAIN:
   BASE_LR: 0.0001
   START_ITERS: 0
 
-  RESUME_OPTIMIZER: True
+  RESUME_OPTIMIZER: False
 
 MODEL:
-  RESUME: ""
+  RESUME: "ckpt/pos-resnet34-adam-100k/best_model.pth"
   PRETRAINED: True
   IMG_SIZE: 64
   NUM_JOINTS: 21
@@ -53,6 +53,6 @@ MODEL:
 
 MISC:
   WORKERS: 4
-  TEST_INTERVAL: 1000
+  TEST_INTERVAL: 100
   DISP_INTERVAL: 1
   RANDOM_SEED: 1234
