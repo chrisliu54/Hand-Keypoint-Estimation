@@ -34,7 +34,7 @@ TRAIN:
   START_ITERS: 0
 
   MCD:
-    NUM_K: 5
+    NUM_K: 1
 
 MODEL:
   RESUME: ""
