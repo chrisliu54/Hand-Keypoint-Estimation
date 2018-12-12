@@ -42,20 +42,20 @@ def main():
     ])
 
     # train
-    source_dset = HandKptDataset(config.DATA.SOURCE.TRAIN.DIR, config.DATA.SOURCE.TRAIN.LBL_FILE,
-                                 stride=config.MODEL.HEATMAP_STRIDE, transformer=train_transformer)
-
-    # target_dset = HandKptDataset(config.DATA.TARGET.TRAIN.DIR, config.DATA.TARGET.TRAIN.LBL_FILE,
+    # source_dset = HandKptDataset(config.DATA.SOURCE.TRAIN.DIR, config.DATA.SOURCE.TRAIN.LBL_FILE,
     #                              stride=config.MODEL.HEATMAP_STRIDE, transformer=train_transformer)
+
+    target_dset = HandKptDataset(config.DATA.TARGET.TRAIN.DIR, config.DATA.TARGET.TRAIN.LBL_FILE,
+                                 stride=config.MODEL.HEATMAP_STRIDE, transformer=train_transformer)
 
     source_val_dset = HandKptDataset(config.DATA.SOURCE.VAL.DIR, config.DATA.SOURCE.VAL.LBL_FILE,
                                      stride=config.MODEL.HEATMAP_STRIDE, transformer=test_transformer)
     target_val_dset = HandKptDataset(config.DATA.TARGET.VAL.DIR, config.DATA.TARGET.VAL.LBL_FILE,
                                      stride=config.MODEL.HEATMAP_STRIDE, transformer=test_transformer)
 
-    # source only
+    # target only
     train_loader = torch.utils.data.DataLoader(
-        source_dset,
+        target_dset,
         batch_size=config.TRAIN.BATCH_SIZE, shuffle=True,
         num_workers=config.MISC.WORKERS, pin_memory=True)
 
@@ -95,6 +95,13 @@ def main():
         print("=> validate pck@0.05 = {}, pck@0.2 = {}".format(pck05 * 100, pck2 * 100))
         return
 
+    # clear mean/std from source (ABN)
+    if len(config.MODEL.RESUME) > 0:
+        for name, m in net.module.named_modules():
+            if isinstance(m, nn.BatchNorm2d):
+                m.running_mean.zero_()
+                m.running_var.fill_(1)
+
     criterion = nn.SmoothL1Loss(reduction='none').to(device)
 
     total_progress_bar = tqdm.tqdm(desc='Train iter', ncols=80,
@@ -103,20 +110,22 @@ def main():
     epoch = 0
 
     while logger.global_step < config.TRAIN.MAX_ITER:
-        for (stu_inputs, stu_heatmap, _) in tqdm.tqdm(
+        for (inputs, heatmap, _) in tqdm.tqdm(
                 train_loader, total=len(train_loader),
                 desc='Current epoch', ncols=80, leave=False):
 
-            stu_inputs = stu_inputs.to(device)
-            stu_heatmap = stu_heatmap.to(device)
+            inputs = inputs.to(device)
+            heatmap = heatmap.to(device)
 
-            stu_heats = net(stu_inputs)
+            if logger.global_step - config.TRAIN.START_ITERS >= 500:
+                pred_heat = net(inputs)
+                loss = criterion(pred_heat, heatmap).sum() / inputs.size(0)
 
-            loss = criterion(stu_heats, stu_heatmap).sum() / stu_inputs.size(0)
-
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+            else:
+                net(inputs.detach())
 
             # val
             if logger.global_step % config.MISC.TEST_INTERVAL == 0:
@@ -139,11 +148,12 @@ def main():
                     'best_metric_val': logger.best_metric_val,
                 }, cur_metric_val=pck05)
 
+            # log
+            if logger.global_step - config.TRAIN.START_ITERS >= 500:
+                logger.add_scalar('regress_loss', loss.item())
+
             logger.step(1)
             total_progress_bar.update(1)
-
-            # log
-            logger.add_scalar('regress_loss', loss.item())
 
         epoch += 1
 

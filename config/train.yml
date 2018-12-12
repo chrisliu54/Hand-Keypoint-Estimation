@@ -20,21 +20,21 @@ DATA:
   TARGET:
     TRAIN:
       DIR: data/images/union/real
-      LBL_FILE: data/labels/real/union_train_labels.txt
+      LBL_FILE: data/labels/real/all_train_labels.txt
     VAL:
       DIR: data/images/CMU_Panoptic/hand_labels/manual_test
       LBL_FILE: data/labels/real/all_test_labels.txt
 
 TRAIN:
   WEIGHT_DECAY: 0.0005
-  MAX_ITER: 16000
+  MAX_ITER: 160000
   BATCH_SIZE: 128
   
   BASE_LR: 0.0001
   START_ITERS: 0
 
 MODEL:
-  RESUME: ""
+  RESUME: "/home/liujintao/app/Hand-Keypoint-Estimation/ckpt/pos-resnet34-adam-100k/best_model.pth"
   PRETRAINED: True
   IMG_SIZE: 64
   NUM_JOINTS: 21
