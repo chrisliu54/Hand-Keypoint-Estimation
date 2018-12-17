@@ -127,16 +127,11 @@ def main():
             union_inputs = torch.cat([source_inputs, target_inputs], dim=0)
 
             # forward
-            union_feats, union_preds = net(union_inputs)
+            union_preds = net(union_inputs)
 
             # calc loss
             regress_loss = criterion(union_preds[:source_size], source_heats).sum() / source_inputs.size(0)
-            jan_loss = JAN(source_list=[union_feats[:source_size], union_preds[:source_size]],
-                           target_list=[union_feats[source_size:], union_preds[source_size:]],
-                           kernel_muls=config.JAN.KERNEL_MULS,
-                           kernel_nums=config.JAN.KERNEL_NUMS,
-                           fix_sigma_list=config.JAN.FIX_SIGMA_LIST)
-            loss = regress_loss + config.JAN.ADV_WEIGHT * jan_loss
+            loss = regress_loss
 
             optimizer.zero_grad()
             loss.backward()
@@ -168,7 +163,6 @@ def main():
 
             # log
             logger.add_scalar('regress_loss', regress_loss.item())
-            logger.add_scalar('jan_loss', jan_loss.item())
             logger.add_scalar('loss', loss.item())
 
         epoch += 1
