@@ -10,7 +10,7 @@ from lib import Mytransforms
 from lib.dataset import HandKptDataset
 from lib.logger import Logger
 from lib.model import pose_resnet
-from lib.model.jan import JAN
+from lib.model.vat import VATLoss
 from lib.model.adv import *
 from lib.options import config
 from lib.utils import evaluate
@@ -102,6 +102,7 @@ def main():
         return
 
     criterion = nn.SmoothL1Loss(reduction='none').to(device)
+    vat = VATLoss(xi=config.MODEL.VAT.XI, eps=config.MODEL.VAT.EPS, ip=config.MODEL.VAT.NUM_ITER)
 
     total_progress_bar = tqdm.tqdm(desc='Train iter', ncols=80,
                                    total=config.TRAIN.MAX_ITER,
@@ -131,7 +132,8 @@ def main():
 
             # calc loss
             regress_loss = criterion(union_preds[:source_size], source_heats).sum() / source_inputs.size(0)
-            loss = regress_loss
+            vat_loss = vat(net, union_inputs, union_preds)
+            loss = regress_loss + config.MODEL.VAT.TRADE_OFF * vat_loss
 
             optimizer.zero_grad()
             loss.backward()
@@ -163,6 +165,7 @@ def main():
 
             # log
             logger.add_scalar('regress_loss', regress_loss.item())
+            logger.add_scalar('vat_loss', vat_loss.item())
             logger.add_scalar('loss', loss.item())
 
         epoch += 1
