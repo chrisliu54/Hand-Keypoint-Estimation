@@ -6,6 +6,32 @@ import tqdm
 plt.switch_backend('agg')
 from lib.Mytransforms import denormalize
 from lib.visualization import vis_kpt
+from collections import Iterable
+
+
+class OptimizerManager:
+    """
+    automatic call op.zero_grad() when enter, call op.step() when exit
+    usage::
+        with OptimizerManager(op): # or with OptimizerManager([op1, op2])
+            b = net.forward(a)
+            b.backward(torch.ones_like(b))
+    """
+    def __init__(self, optims):
+        self.optims = optims if isinstance(optims, Iterable) else [optims]
+
+    def __enter__(self):
+        for op in self.optims:
+            op.zero_grad()
+
+    def __exit__(self, exceptionType, exception, exceptionTraceback):
+        for op in self.optims:
+            op.step()
+        self.optims = None # release reference, to avoid imexplicit reference
+        if exceptionTraceback:
+            print(exceptionTraceback)
+            return False
+        return True
 
 
 def PCK(pred, gt, img_side_len, alpha=0.2):
