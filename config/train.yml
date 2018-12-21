@@ -20,7 +20,7 @@ DATA:
   TARGET:
     TRAIN:
       DIR: data/images/union/real
-      LBL_FILE: data/labels/real/union_train_labels.txt
+      LBL_FILE: data/labels/real/kwai_label_file.txt
     VAL:
       DIR: data/images/CMU_Panoptic/hand_labels/manual_test
       LBL_FILE: data/labels/real/all_test_labels.txt
@@ -33,10 +33,12 @@ TRAIN:
   BASE_LR: 0.0001
   START_ITERS: 0
 
-  DISC:
-    NUM_ITER_SUP: 0
+  ACCORD:
+    TRADE_OFF: 0.01
 
 MODEL:
+  RESUME_PRE_SRC: "/home/liujintao/app/Hand-Keypoint-Estimation/ckpt/pos-resnet34-adam-100k/best_model.pth"
+  RESUME_PRE_TGT: "/home/liujintao/app/Hand-Keypoint-Estimation/ckpt/pos-resnet34-real/best_model.pth"
   RESUME: ""
   PRETRAINED: True
   IMG_SIZE: 64

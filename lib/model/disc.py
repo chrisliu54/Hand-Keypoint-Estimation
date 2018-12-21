@@ -1,7 +1,7 @@
 import torch
 
 
-def smooth_l1_loss(input, target, beta=1, size_average=True):
+def smooth_l1_loss(input, target, beta=1, size_average=False):
     """
     very similar to the smooth_l1_loss from pytorch, but with
     the extra beta parameter
@@ -24,3 +24,10 @@ def discrepancy(source_data, target_data, h1, h2, criterion=smooth_l1_loss):
     src_disc = criterion(src_h1, src_h2)
     tgt_disc = criterion(tgt_h1, tgt_h2)
     return torch.abs(src_disc - tgt_disc)
+
+
+def consistency(data, h1, h2, criterion=smooth_l1_loss):
+    pred1 = h1(data)
+    pred2 = h2(data)
+
+    return criterion(pred1, pred2) / data.size(0)
