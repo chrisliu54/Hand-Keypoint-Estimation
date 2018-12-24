@@ -48,7 +48,7 @@ def JAN(source_list, target_list, kernel_muls=[2.0, 2.0], kernel_nums=[5, 1], fi
         kernel_num = kernel_nums[i]
         fix_sigma = fix_sigma_list[i]
         kernels = guassian_kernel(source, target,
-                                  kernel_mul=kernel_mul, kernel_num=kernel_num, fix_sigma=fix_sigma)
+                                  kernel_mul=kernel_mul, kernel_num=kernel_num, fix_sigma=fix_sigma, matrix_op=True)
         if joint_kernels is not None:
             joint_kernels = joint_kernels * kernels
         else:

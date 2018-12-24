@@ -241,9 +241,9 @@ class PoseResNet(nn.Module):
         x = self.layer2(x)
         x = self.layer3(x)
         x = self.layer4(x)
+        feat = x
 
         x = self.deconv_layers(x)
-        feat = x
         x = self.final_layer(x)
 
         return feat, x
