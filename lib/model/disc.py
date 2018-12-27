@@ -14,13 +14,17 @@ def smooth_l1_loss(input, target, beta=1, size_average=True):
     return loss.sum()
 
 
-def discrepancy(source_data, target_data, h1, h2, criterion=smooth_l1_loss):
-    src_h1 = h1(source_data)
-    src_h2 = h2(source_data)
+def discrepancy(source_data, target_data, base_net, h1, h2, criterion=smooth_l1_loss):
+    source_feat = base_net(source_data)
+    target_feat = base_net(target_data)
+    union_feat = torch.cat([source_feat, target_feat], dim=0).detach()
 
-    tgt_h1 = h1(target_data)
-    tgt_h2 = h2(target_data)
+    src_h1 = h1(source_feat)
+    src_h2 = h2(source_feat)
+
+    tgt_h1 = h1(target_feat)
+    tgt_h2 = h2(target_feat)
 
     src_disc = criterion(src_h1, src_h2)
     tgt_disc = criterion(tgt_h1, tgt_h2)
-    return torch.abs(src_disc - tgt_disc)
+    return union_feat, torch.abs(src_disc - tgt_disc)
