@@ -13,6 +13,7 @@ from lib.model import pose_resnet
 from lib.model.adv import *
 from lib.options import config
 from lib.utils import evaluate
+from lib.visualization import visualize_TSNE
 
 
 def discrepancy(out1, out2):
@@ -209,6 +210,9 @@ def main():
 
             # val
             if logger.global_step % config.MISC.TEST_INTERVAL == 0:
+                # visualize TSNE for layer4 feature embedding
+                visualize_TSNE(torch.cat([feat_s, feat_t], dim=0).detach(), logger)
+
                 val_loader = [{'src': source_val_loader},
                               {'tgt': target_val_loader}]
                 pred_nets = [{'pred_net_1': pred_net_1, 'pred_net_2': None, 'status': 'PRED_NET_1'},
