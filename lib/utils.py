@@ -65,7 +65,7 @@ def evaluate(base_net, loader, img_size, pred_net_1=None, pred_net_2=None, statu
     :param disp_interval: interval of display
     :param show_gt: show ground truth or not, disabled if vis=False
     :param is_target: is from target domain or not, disabled if vis=False
-    :return: PCK@0.05, PCK@0.2
+    :return: PCK@0.1, PCK@0.15
     """
     assert base_net is not None, 'ERROR: base net is NOT specified!'
     assert pred_net_1 is not None or pred_net_2 is not None, 'ERROR: prediction nets are all NOT specified!'
@@ -142,4 +142,4 @@ def evaluate(base_net, loader, img_size, pred_net_1=None, pred_net_2=None, statu
 
     logger.add_figure('{}_{}_PCK_curve'.format(domain_prefix, status), pck_line.figure)
 
-    return tot_nkpts[5], tot_nkpts[-1]
+    return tot_nkpts[10], tot_nkpts[15]

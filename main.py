@@ -114,18 +114,18 @@ def main():
     pred_net_2 = torch.nn.DataParallel(pred_net_2)
 
     if config.EVALUATE:
-        pck05, pck2 = evaluate(base_net, target_val_loader, pred_net_1=pred_net_1, img_size=config.MODEL.IMG_SIZE,
+        pck1, pck15 = evaluate(base_net, target_val_loader, pred_net_1=pred_net_1, img_size=config.MODEL.IMG_SIZE,
                                vis=True, logger=logger, status='PRED_NET_1', disp_interval=config.MISC.DISP_INTERVAL)
-        print("=> validate pred_net_1 pck@0.05 = {}, pck@0.2 = {}".format(pck05 * 100, pck2 * 100))
+        print("=> validate pred_net_1 pck@0.1 = {}, pck@0.15 = {}".format(pck1 * 100, pck15 * 100))
 
-        pck05, pck2 = evaluate(base_net, target_val_loader, pred_net_2=pred_net_2, img_size=config.MODEL.IMG_SIZE,
+        pck1, pck15 = evaluate(base_net, target_val_loader, pred_net_2=pred_net_2, img_size=config.MODEL.IMG_SIZE,
                                vis=True, logger=logger, status='PRED_NET_2', disp_interval=config.MISC.DISP_INTERVAL)
-        print("=> validate pred_net_2 pck@0.05 = {}, pck@0.2 = {}".format(pck05 * 100, pck2 * 100))
+        print("=> validate pred_net_2 pck@0.1 = {}, pck@0.15 = {}".format(pck1 * 100, pck15 * 100))
 
-        pck05, pck2 = evaluate(base_net, target_val_loader, pred_net_1=pred_net_1, pred_net_2=pred_net_2,
+        pck1, pck15 = evaluate(base_net, target_val_loader, pred_net_1=pred_net_1, pred_net_2=pred_net_2,
                                img_size=config.MODEL.IMG_SIZE, vis=True, logger=logger, status='AVG',
                                disp_interval=config.MISC.DISP_INTERVAL)
-        print("=> validate ensemble(avg) pck@0.05 = {}, pck@0.2 = {}".format(pck05 * 100, pck2 * 100))
+        print("=> validate ensemble(avg) pck@0.1 = {}, pck@0.15 = {}".format(pck1 * 100, pck15 * 100))
 
         return
 
@@ -150,59 +150,67 @@ def main():
             source_heats = source_heats.to(device)
             target_inputs = target_inputs.to(device)
 
+
             #################################
             #            STAGE 1            #
             #################################
-            # forward source
+            # source training
             feat_s = base_net(source_inputs)
             output_s1 = pred_net_1(feat_s)
-            output_s2 = pred_net_2(feat_s)
+            # output_s2 = pred_net_2(feat_s)
 
             loss_s1 = criterion(output_s1, source_heats).sum() / source_inputs.size(0)
-            loss_s2 = criterion(output_s2, source_heats).sum() / source_inputs.size(0)
 
-            loss_s = loss_s1 + loss_s2
-
-            # update F, C1, C2
-            optim_b.zero_grad(); optim_p1.zero_grad(); optim_p2.zero_grad()
-            loss_s.backward()
-            optim_b.step(); optim_p1.step(); optim_p2.step()
+            optim_b.zero_grad();optim_p1.zero_grad();optim_p2.zero_grad()
+            loss_s1.backward()
+            optim_p1.step();optim_b.step()
 
             #################################
             #            STAGE 2            #
             #################################
+            # net2 training
             # forward source again
             feat_s = base_net(source_inputs)
             output_s1 = pred_net_1(feat_s)
             output_s2 = pred_net_2(feat_s)
 
-            loss_s1 = criterion(output_s1, source_heats).sum() / source_inputs.size(0)
-            loss_s2 = criterion(output_s2, source_heats).sum() / source_inputs.size(0)
-
-            loss_s = loss_s1 + loss_s2
-
             # forward target
             feat_t = base_net(target_inputs)
             output_t1 = pred_net_1(feat_t)
             output_t2 = pred_net_2(feat_t)
-            loss_dis = discrepancy(output_t1, output_t2)
-            loss = loss_s - loss_dis
+
+            output_s1_n = output_s1.data.to(device)
+            output_t1_n = output_t1.data.to(device)
+            # loss_dis = discrepancy(output_t1, output_t2)
+
+            loss_adv = criterion(output_t2, output_t1_n).sum() / target_inputs.size(0) - criterion(output_s2, output_s1_n).sum() / source_inputs.size(0)
+            loss = - loss_adv
 
             # update C1, C2
             optim_b.zero_grad(); optim_p1.zero_grad(); optim_p2.zero_grad()
             loss.backward()
-            optim_p1.step(); optim_p2.step()
+            optim_p2.step()
 
             #################################
             #            STAGE 3            #
             #################################
             for i in range(config.TRAIN.MCD.NUM_K):
                 # forward target
+                feat_s = base_net(source_inputs)
+                output_s1 = pred_net_1(feat_s)
+                output_s2 = pred_net_2(feat_s)
+
+                # forward target
                 feat_t = base_net(target_inputs)
                 output_t1 = pred_net_1(feat_t)
                 output_t2 = pred_net_2(feat_t)
-                loss_dis = discrepancy(output_t1, output_t2)
 
+                output_s1_n = output_s1.data.to(device)
+                output_t1_n = output_t1.data.to(device)
+
+                loss_adv = criterion(output_t2, output_t1_n).sum() / target_inputs.size(0) - criterion(output_s2,
+                                                                                                       output_s1_n).sum() / source_inputs.size(0)
+                loss_dis = loss_adv
                 # update F
                 optim_b.zero_grad()
                 loss_dis.backward()
@@ -221,12 +229,12 @@ def main():
                 for val_dict in val_loader:
                     for net_dict in pred_nets:
                         domain, loader = list(val_dict.items())[0]
-                        pck05, pck2 = evaluate(base_net, loader, img_size=config.MODEL.IMG_SIZE, vis=True,
+                        pck1, pck15 = evaluate(base_net, loader, img_size=config.MODEL.IMG_SIZE, vis=True,
                                                logger=logger, disp_interval=config.MISC.DISP_INTERVAL,
                                                show_gt=(logger.global_step == 0), is_target=(domain == 'tgt'),
                                                **net_dict)
-                        logger.add_scalar('{}_{}_pck@0.05'.format(domain, net_dict['status']), pck05 * 100)
-                        logger.add_scalar('{}_{}_pck@0.2'.format(domain, net_dict['status']), pck2 * 100)
+                        logger.add_scalar('{}_{}_pck@0.1'.format(domain, net_dict['status']), pck1 * 100)
+                        logger.add_scalar('{}_{}_pck@0.15'.format(domain, net_dict['status']), pck15 * 100)
                         if domain == 'tgt':
                             logger.save_ckpt(state={
                                 'base_net': base_net.module.state_dict(),
@@ -238,13 +246,13 @@ def main():
                                 'iter': logger.global_step,
                                 'cur_status': net_dict['status'],
                                 'best_metric_val': logger.best_metric_val,
-                            }, cur_metric_val=pck05)
+                            }, cur_metric_val=pck1)
 
             logger.step(1)
             total_progress_bar.update(1)
 
             # log
-            logger.add_scalar('loss_s', loss_s.item())
+            logger.add_scalar('loss_s', loss_s1.item())
             logger.add_scalar('loss_tgt_dis', loss_dis.item())
 
         epoch += 1
